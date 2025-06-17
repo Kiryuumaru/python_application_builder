@@ -11,7 +11,7 @@
     <OutputPath>.</OutputPath>
     <Name>PythonApplication3</Name>
     <RootNamespace>PythonApplication3</RootNamespace>
-    <InterpreterId>MSBuild|application_builder_sample|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>MSBuild|python_application_builder_env|$(MSBuildProjectFullPath)</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -45,10 +45,10 @@
     <Content Include="requirements.txt" />
   </ItemGroup>
   <ItemGroup>
-    <Interpreter Include="application_builder_sample\">
-      <Id>application_builder_sample</Id>
+    <Interpreter Include="envs\python_application_builder_env\python_application_builder_env\">
+      <Id>python_application_builder_env</Id>
       <Version>3.9</Version>
-      <Description>application_builder_sample (Python 3.9 (64-bit))</Description>
+      <Description>python_application_builder_env (Python 3.9 (64-bit))</Description>
       <InterpreterPath>Scripts\python.exe</InterpreterPath>
       <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
       <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
