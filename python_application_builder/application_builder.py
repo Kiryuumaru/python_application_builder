@@ -34,17 +34,7 @@ class DependencyCore:
         self._dependency_keys: List[str] = []
         self._dependency_local_key: Union[str, None] = None
         self._application_host: Union[ApplicationHost, None] = None
-
-
-class Dependency(DependencyCore, metaclass=Meta):
-    """
-    Base class for all injectable components in the application.
-    Provides access to services, factories, and configuration.
-    """
-    def __init__(self):
-        self._dependency_is_initialized = False
-        self.logger: Union[loguru.Logger, None] = None
-
+        
     def get_configuration(self, key: str, default: Any = None) -> Any:
         """
         Retrieve a configuration value by key.
@@ -157,6 +147,16 @@ class Dependency(DependencyCore, metaclass=Meta):
             return factories[local_key]
         return next(iter(factories.values()))
 
+
+class Dependency(DependencyCore, metaclass=Meta):
+    """
+    Base class for all injectable components in the application.
+    Provides access to services, factories, and configuration.
+    """
+    def __init__(self):
+        self._dependency_is_initialized = False
+        self.logger: Union[loguru.Logger, None] = None
+
     def initialize(self):
         """
         Initialize the dependency. Called after dependency creation.
@@ -170,7 +170,7 @@ class DependencyFactory(Generic[TDependency], DependencyCore):
     Factory for creating instances of a specific dependency type.
     Manages the creation and initialization of new instances.
     """
-    def __init__(self, dependency_factory: Union[Callable[[], TDependency], None]):
+    def __init__(self, dependency_factory: Union[Callable[[DependencyCore], TDependency], None]):
         """
         Initialize a new dependency factory.
 
@@ -178,7 +178,7 @@ class DependencyFactory(Generic[TDependency], DependencyCore):
             dependency_factory: Function that creates new instances of the dependency.
         """
         super().__init__()
-        self._dependency_factory: Callable[[], TDependency] = dependency_factory
+        self._dependency_factory: Callable[[DependencyCore], TDependency] = dependency_factory
 
     def create(self) -> TDependency:
         """
@@ -187,7 +187,7 @@ class DependencyFactory(Generic[TDependency], DependencyCore):
         Returns:
             A new, initialized instance of the dependency.
         """
-        service = self._dependency_factory()
+        service = self._dependency_factory(self)
         service.initialize()
         service.logger.debug(f"Service '{service._dependency_local_key}' initialized")
         return service
@@ -336,7 +336,7 @@ class ApplicationBuilder:
             self._application_host.services[key][service._dependency_local_key] = service
 
     def add_factory(self, factory_type: type[TDependency], local_key: Union[str, None] = None, 
-                    name: Union[str, None] = None, custom_factory: Union[Callable[[], TDependency], None] = None):
+                    name: Union[str, None] = None, custom_factory: Union[Callable[[DependencyCore], TDependency], None] = None):
         """
         Register a factory for creating instances of the specified type.
 
@@ -362,13 +362,13 @@ class ApplicationBuilder:
             # Register with custom factory
             app_builder.add_factory(PetFoodService, custom_factory=create_custom_pet_food)
         """
-        def default_factory() -> TDependency:
+        def default_factory(dependency_context: DependencyCore) -> TDependency:
             return factory_type()
         
         factory_function = custom_factory if custom_factory is not None else default_factory
         
-        def core_default_factory() -> TDependency:
-            service = factory_function()
+        def core_default_factory(dependency_context: DependencyCore) -> TDependency:
+            service = factory_function(dependency_context)
             self._wire_dependency(service, local_key, name)
             return service
 
