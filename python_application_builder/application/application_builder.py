@@ -169,7 +169,7 @@ class ApplicationBuilder:
         key = service_type.__name__
         services = self.get_services(service_type)
         if local_key is None and len(services) > 1:
-            raise Exception(f"Service '{key}' have more than one implementation: {[s._dependency_keys[0] for s in services]}")
+            raise Exception(f"Service '{key}' have more than one implementation: {[s._dependency_keys[0] for s in services.values()]}")
         if local_key is not None:
             if local_key not in services:
                 raise Exception(f"Service '{local_key}' does not exist in '{key}'")
@@ -189,7 +189,7 @@ class ApplicationBuilder:
         key = factory_type.__name__
         factories = self.get_factories(factory_type)
         if local_key is None and len(factories) > 1:
-            raise Exception(f"Factory '{key}' have more than one implementation: {[s._dependency_keys[0] for s in factories]}")
+            raise Exception(f"Factory '{key}' have more than one implementation: {[s._dependency_keys[0] for s in factories.values()]}")
         if local_key is not None:
             if local_key not in factories:
                 raise Exception(f"Factory '{local_key}' does not exist in '{key}'")

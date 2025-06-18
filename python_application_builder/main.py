@@ -8,7 +8,7 @@ from infrastructure.petfood.services.pet_food_service import PetFoodService
 app_builder: ApplicationBuilder = ApplicationBuilder()
 
 # Add services
-app_builder.add_service(CatService)
+app_builder.add_service(CatService, "special")
 app_builder.add_service(DogService)
 
 # Add factories
