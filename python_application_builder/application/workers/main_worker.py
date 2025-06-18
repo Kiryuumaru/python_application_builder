@@ -8,5 +8,10 @@ class MainWorker(Worker):
         
         animal_services = self.get_services(BaseAnimalService)
 
-        for animal_service in animal_services:
+        for animal_service in animal_services.values():
             animal_service.speak()
+
+        animal_service_special = self.get_service(BaseAnimalService, "special")
+
+        animal_service_special.speak()
+
