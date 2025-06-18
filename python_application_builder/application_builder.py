@@ -45,6 +45,26 @@ class Dependency(DependencyCore, metaclass=Meta):
         self._dependency_is_initialized = False
         self.logger: Union[loguru.Logger, None] = None
 
+    def get_configuration(self, key: str, default: Any = None) -> Any:
+        """
+        Get a configuration value by key.
+        
+        Args:
+            key: The configuration key to retrieve
+            default: Optional default value if the key doesn't exist
+            
+        Returns:
+            The configuration value or default
+            
+        Raises:
+            Exception: If the key doesn't exist and no default is provided
+        """
+        if key in self.application_builder.configurations:
+            return self.application_builder.configurations[key]
+        if default is not None:
+            return default
+        raise Exception(f"Configuration '{key}' does not exist")
+
     def get_services(self, service_type: type[TDependency]) -> Dict[str, TDependency]:
         """
         Get all registered services of the specified type.
@@ -54,8 +74,17 @@ class Dependency(DependencyCore, metaclass=Meta):
             
         Returns:
             Dictionary of services with their local keys
+            
+        Raises:
+            Exception: If no services of the specified type exist
         """
-        return self.application_builder.get_services(service_type)
+        key = service_type.__name__
+        if key not in self.application_builder.services:
+            raise Exception(f"Service '{key}' does not exist")
+        services: Dict[str, TDependency] = {}
+        for key, service in self.application_builder.services[key].items():
+            services[key] = service
+        return services
 
     def get_service(self, service_type: type[TDependency], local_key: Union[str, None] = None) -> TDependency:
         """
@@ -67,8 +96,20 @@ class Dependency(DependencyCore, metaclass=Meta):
             
         Returns:
             The requested service instance
+            
+        Raises:
+            Exception: If no service with the specified key exists or if multiple services
+                      exist but no key is provided
         """
-        return self.application_builder.get_service(service_type, local_key)
+        key = service_type.__name__
+        services = self.get_services(service_type)
+        if local_key is None and len(services) > 1:
+            raise Exception(f"Service '{key}' have more than one implementation: {[s._dependency_local_key for s in services.values()]}")
+        if local_key is not None:
+            if local_key not in services:
+                raise Exception(f"Service '{local_key}' does not exist in '{key}'")
+            return services[local_key]
+        return next(iter(services.values()))
 
     def get_factories(self, factory_type: type[TDependency]) -> Dict[str, DependencyFactory[TDependency]]:
         """
@@ -79,8 +120,17 @@ class Dependency(DependencyCore, metaclass=Meta):
             
         Returns:
             Dictionary of factories with their local keys
+            
+        Raises:
+            Exception: If no factories of the specified type exist
         """
-        return self.application_builder.get_factories(factory_type)
+        key = factory_type.__name__
+        if key not in self.application_builder.factories:
+            raise Exception(f"Factory '{key}' does not exist")
+        factories: Dict[str, DependencyFactory[TDependency]] = {}
+        for key, factory in self.application_builder.factories[key].items():
+            factories[key] = factory
+        return factories
 
     def get_factory(self, factory_type: type[TDependency], local_key: Union[str, None] = None) -> DependencyFactory[TDependency]:
         """
@@ -92,21 +142,20 @@ class Dependency(DependencyCore, metaclass=Meta):
             
         Returns:
             The requested factory instance
-        """
-        return self.application_builder.get_factory(factory_type, local_key)
-
-    def get_configuration(self, key: str, default: Any = None) -> Any:
-        """
-        Get a configuration value by key.
-        
-        Args:
-            key: The configuration key to retrieve
-            default: Optional default value if the key doesn't exist
             
-        Returns:
-            The configuration value or default
+        Raises:
+            Exception: If no factory with the specified key exists or if multiple factories
+                      exist but no key is provided
         """
-        return self.application_builder.get_configuration(key, default)
+        key = factory_type.__name__
+        factories = self.get_factories(factory_type)
+        if local_key is None and len(factories) > 1:
+            raise Exception(f"Factory '{key}' have more than one implementation: {[s._dependency_local_key for s in factories.values()]}")
+        if local_key is not None:
+            if local_key not in factories:
+                raise Exception(f"Factory '{local_key}' does not exist in '{key}'")
+            return factories[local_key]
+        return next(iter(factories.values()))
 
     def initialize(self):
         """
@@ -349,118 +398,6 @@ class ApplicationBuilder:
         if key in self.workers:
             raise Exception(f"Worker '{key}' already exists")
         self.workers[key] = worker
-
-    def get_configuration(self, key: str, default: Any = None) -> Any:
-        """
-        Get a configuration value by key.
-        
-        Args:
-            key: The configuration key to retrieve
-            default: Optional default value if the key doesn't exist
-            
-        Returns:
-            The configuration value or default
-            
-        Raises:
-            Exception: If the key doesn't exist and no default is provided
-        """
-        if key in self.configurations:
-            return self.configurations[key]
-        if default is not None:
-            return default
-        raise Exception(f"Configuration '{key}' does not exist")
-
-    def get_services(self, service_type: type[TDependency]) -> Dict[str, TDependency]:
-        """
-        Get all registered services of the specified type.
-        
-        Args:
-            service_type: The type of services to retrieve
-            
-        Returns:
-            Dictionary of services with their local keys
-            
-        Raises:
-            Exception: If no services of the specified type exist
-        """
-        key = service_type.__name__
-        if key not in self.services:
-            raise Exception(f"Service '{key}' does not exist")
-        services: Dict[str, TDependency] = {}
-        for key, service in self.services[key].items():
-            services[key] = service
-        return services
-
-    def get_service(self, service_type: type[TDependency], local_key: Union[str, None] = None) -> TDependency:
-        """
-        Get a specific service of the specified type.
-        
-        Args:
-            service_type: The type of service to retrieve
-            local_key: Optional key to identify a specific service implementation
-            
-        Returns:
-            The requested service instance
-            
-        Raises:
-            Exception: If no service with the specified key exists or if multiple services
-                      exist but no key is provided
-        """
-        key = service_type.__name__
-        services = self.get_services(service_type)
-        if local_key is None and len(services) > 1:
-            raise Exception(f"Service '{key}' have more than one implementation: {[s._dependency_local_key for s in services.values()]}")
-        if local_key is not None:
-            if local_key not in services:
-                raise Exception(f"Service '{local_key}' does not exist in '{key}'")
-            return services[local_key]
-        return next(iter(services.values()))
-
-    def get_factories(self, factory_type: type[TDependency]) -> Dict[str, DependencyFactory[TDependency]]:
-        """
-        Get all registered factories for the specified type.
-        
-        Args:
-            factory_type: The type of factories to retrieve
-            
-        Returns:
-            Dictionary of factories with their local keys
-            
-        Raises:
-            Exception: If no factories of the specified type exist
-        """
-        key = factory_type.__name__
-        if key not in self.factories:
-            raise Exception(f"Factory '{key}' does not exist")
-        factories: Dict[str, DependencyFactory[TDependency]] = {}
-        for key, factory in self.factories[key].items():
-            factories[key] = factory
-        return factories
-
-    def get_factory(self, factory_type: type[TDependency], local_key: Union[str, None] = None) -> DependencyFactory[TDependency]:
-        """
-        Get a specific factory for the specified type.
-        
-        Args:
-            factory_type: The type of factory to retrieve
-            local_key: Optional key to identify a specific factory implementation
-            
-        Returns:
-            The requested factory instance
-            
-        Raises:
-            Exception: If no factory with the specified key exists or if multiple factories
-                      exist but no key is provided
-        """
-        key = factory_type.__name__
-        factories = self.get_factories(factory_type)
-        if local_key is None and len(factories) > 1:
-            raise Exception(f"Factory '{key}' have more than one implementation: {[s._dependency_local_key for s in factories.values()]}")
-        if local_key is not None:
-            if local_key not in factories:
-                raise Exception(f"Factory '{local_key}' does not exist in '{key}'")
-            return factories[local_key]
-        return next(iter(factories.values()))
 
     def run(self):
         """
