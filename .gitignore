@@ -362,3 +362,4 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /python_application_builder/envs/python_application_builder_env/python_application_builder_env
+/python_application_builder/env/env
