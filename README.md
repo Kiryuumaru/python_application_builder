@@ -222,6 +222,12 @@ class CloudStorageService(BaseStorageService):
         self.logger.info(f"Stored in cloud: {url}")
         return url
 
+class StorageWorker(Worker):
+    def run(self):
+        factory = self.get_factory(BaseStorageService)
+        storage = factory.create()
+        storage.store("document.txt")
+
 def create_storage(dependency_context: DependencyCore):
     # Environment variables are automatically available via get_configuration
     storage_type = dependency_context.get_configuration("STORAGE_TYPE", "local")
@@ -229,12 +235,6 @@ def create_storage(dependency_context: DependencyCore):
         return LocalStorageService()
     else:
         return CloudStorageService()
-
-class StorageWorker(Worker):
-    def run(self):
-        factory = self.get_factory(BaseStorageService)
-        storage = factory.create()
-        storage.store("document.txt")
 
 app_builder = ApplicationBuilder()
 app_builder.add_factory(BaseStorageService, custom_factory=create_storage)
