@@ -330,7 +330,7 @@ python_application_builder/
 ├── main.py                         # Application entry point
 ├── requirements.txt                # Dependencies
 ├── workers/
-│   └── main_worker.py             # Main application worker
+│   └── main_worker.py              # Main application worker
 ├── application/                    # Application layer (interfaces/contracts)
 │   ├── database/
 │   │   └── services/
