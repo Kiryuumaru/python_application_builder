@@ -15,3 +15,9 @@ class MainWorker(Worker):
 
         animal_service_special.speak()
 
+        self.logger.trace("trace")
+        self.logger.debug("debug")
+        self.logger.info("info")
+        self.logger.warning("warning")
+        self.logger.error("error")
+        self.logger.critical("critical")

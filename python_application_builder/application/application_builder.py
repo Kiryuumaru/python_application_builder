@@ -60,7 +60,7 @@ class DependencyFactory(Generic[TDependency], DependencyCore):
     def create(self) -> TDependency:
         service = self._dependency_factory()
         self.application_builder._wire_dependency(service, self._dependency_name)
-        service.logger.info(f"Creating service '{self._dependency_name}' from factory")
+        service.logger.debug(f"Service '{service._dependency_local_key}' initialized")
         service.initialize()
         return service
 
@@ -90,6 +90,20 @@ class ApplicationBuilder:
             self._add_base_classes(dependency._dependency_keys, base_class)
         dependency.application_builder = self
         dependency.logger = loguru.logger.bind(context=dependency._dependency_name)
+        dependency.logger.level("TRACE", 
+                                color="<fg #444444>")
+        dependency.logger.level("DEBUG", 
+                                color="<fg #666666>")
+        dependency.logger.level("INFO", 
+                                color="<fg #FFFFFF>")
+        dependency.logger.level("SUCCESS", 
+                                color="<fg #00CC99>")
+        dependency.logger.level("WARNING", 
+                                color="<fg #FFBB00>")
+        dependency.logger.level("ERROR", 
+                                color="<fg #FF4444>")
+        dependency.logger.level("CRITICAL", 
+                                color="<fg #FF00FF>")
 
     def _wire_dependency_factory(self, dependency_factory: DependencyFactory[TDependency], key: Union[str, None] = None, name: Union[str, None] = None):
         dependency_type = dependency_factory.__orig_class__.__args__[0]
@@ -109,10 +123,10 @@ class ApplicationBuilder:
         if not dependency._dependency_is_initialized:
             dependency.initialize()
             dependency._dependency_is_initialized = True
-            dependency.logger.info("Service initialized")
+            dependency.logger.debug(f"Service '{dependency._dependency_local_key}' initialized")
 
     def _run_worker(self, worker: Worker):
-        worker.logger.info("Worker started")
+        worker.logger.debug(f"Worker '{worker._dependency_local_key}' started")
         worker.run()
 
     def add_configuration(self, key: str, value: Any):
@@ -126,7 +140,7 @@ class ApplicationBuilder:
             if key not in self.services:
                 self.services[key] = {}
             if service._dependency_local_key in self.services[key]:
-                raise Exception(f"Service '{service._dependency_local_key}' already exists in '{local_key}'")
+                raise Exception(f"Service '{service._dependency_local_key}' already exists in '{key}'")
             self.services[key][service._dependency_local_key] = service
 
     def add_factory(self, factory_type: type[TDependency], local_key: Union[str, None] = None, name: Union[str, None] = None):
@@ -138,7 +152,7 @@ class ApplicationBuilder:
             if key not in self.factories:
                 self.factories[key] = {}
             if factory._dependency_local_key in self.factories[key]:
-                raise Exception(f"Factory '{factory._dependency_local_key}' already exists in '{local_key}'")
+                raise Exception(f"Factory '{factory._dependency_local_key}' already exists in '{key}'")
             self.factories[key][factory._dependency_local_key] = factory
 
     def add_worker(self, worker_type: type[TWorker], name: Union[str, None] = None):
@@ -169,7 +183,7 @@ class ApplicationBuilder:
         key = service_type.__name__
         services = self.get_services(service_type)
         if local_key is None and len(services) > 1:
-            raise Exception(f"Service '{key}' have more than one implementation: {[s._dependency_keys[0] for s in services.values()]}")
+            raise Exception(f"Service '{key}' have more than one implementation: {[s._dependency_local_key for s in services.values()]}")
         if local_key is not None:
             if local_key not in services:
                 raise Exception(f"Service '{local_key}' does not exist in '{key}'")
@@ -189,7 +203,7 @@ class ApplicationBuilder:
         key = factory_type.__name__
         factories = self.get_factories(factory_type)
         if local_key is None and len(factories) > 1:
-            raise Exception(f"Factory '{key}' have more than one implementation: {[s._dependency_keys[0] for s in factories.values()]}")
+            raise Exception(f"Factory '{key}' have more than one implementation: {[s._dependency_local_key for s in factories.values()]}")
         if local_key is not None:
             if local_key not in factories:
                 raise Exception(f"Factory '{local_key}' does not exist in '{key}'")
@@ -198,8 +212,8 @@ class ApplicationBuilder:
 
     def run(self):
         loguru.logger.remove()
-        loguru.logger.add(sys.stdout, colorize=True, format=self.log_format)
-        loguru.logger.add(os.path.join(self.log_dir, "main_{time:YYYY-MM-DD}.log"), format=self.log_format,
+        loguru.logger.add(sys.stdout, colorize=True, format=self.log_format, level="TRACE")
+        loguru.logger.add(os.path.join(self.log_dir, "main_{time:YYYY-MM-DD}.log"), format=self.log_format, level="TRACE",
                           rotation="1 day", retention="30 days")
 
         for key, value in os.environ.items():
