@@ -1,5 +1,5 @@
-from application.application_builder import ApplicationBuilder
-from application.workers.main_worker import MainWorker
+from application_builder import ApplicationBuilder
+from workers.main_worker import MainWorker
 from infrastructure.animal_samples.services.cat_service import CatService
 from infrastructure.animal_samples.services.dog_service import DogService
 from infrastructure.petfood.services.pet_food_service import PetFoodService

@@ -23,19 +23,22 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="application\services\base_food_service.py" />
-    <Compile Include="application\services\base_animal_service.py" />
-    <Compile Include="application\application_builder.py" />
+    <Compile Include="application\animal\services\base_animal_service.py" />
+    <Compile Include="application\food\services\base_food_service.py" />
+    <Compile Include="application_builder.py" />
     <Compile Include="infrastructure\animal_samples\services\cat_service.py" />
     <Compile Include="infrastructure\animal_samples\services\dog_service.py" />
     <Compile Include="infrastructure\petfood\services\pet_food_service.py" />
     <Compile Include="main.py" />
-    <Compile Include="application\workers\main_worker.py" />
+    <Compile Include="workers\main_worker.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="application\" />
-    <Folder Include="application\services\" />
-    <Folder Include="application\workers\" />
+    <Folder Include="application\animal\" />
+    <Folder Include="application\animal\services\" />
+    <Folder Include="application\food\" />
+    <Folder Include="application\food\services\" />
+    <Folder Include="workers\" />
     <Folder Include="infrastructure\" />
     <Folder Include="infrastructure\petfood\" />
     <Folder Include="infrastructure\petfood\services\" />

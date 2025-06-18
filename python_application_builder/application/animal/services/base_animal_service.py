@@ -1,6 +1,5 @@
 
-from typing import Union
-from application.application_builder import Dependency
+from application_builder import Dependency
 
 class BaseAnimalService(Dependency):
 

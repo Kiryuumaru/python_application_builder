@@ -1,5 +1,5 @@
 
-from application.services.base_food_service import BaseFoodService
+from application.food.services.base_food_service import BaseFoodService
 
 class PetFoodService(BaseFoodService):
 

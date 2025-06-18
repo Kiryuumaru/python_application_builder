@@ -1,6 +1,6 @@
 
-from application.services.base_animal_service import BaseAnimalService
-from application.services.base_food_service import BaseFoodService
+from application.animal.services.base_animal_service import BaseAnimalService
+from application.food.services.base_food_service import BaseFoodService
 
 
 class DogService(BaseAnimalService):

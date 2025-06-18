@@ -1,5 +1,5 @@
-from application.services.base_animal_service import BaseAnimalService
-from application.application_builder import Worker
+from application.animal.services.base_animal_service import BaseAnimalService
+from application_builder import Worker
 
 
 class MainWorker(Worker):
@@ -18,6 +18,7 @@ class MainWorker(Worker):
         self.logger.trace("trace")
         self.logger.debug("debug")
         self.logger.info("info")
+        self.logger.success("success")
         self.logger.warning("warning")
         self.logger.error("error")
         self.logger.critical("critical")
