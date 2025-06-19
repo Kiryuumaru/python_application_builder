@@ -825,6 +825,10 @@ class ApplicationBuilder:
         # Create the service provider
         provider = ServiceProvider(self._descriptors)
         
+        # Register the scope factory
+        scope_factory = ScopeFactory(provider)
+        self.add_singleton_instance(ScopeFactory, scope_factory)
+    
         # Discover and register hosted services
         if auto_start_hosted_services:
             provider.start_hosted_services()
@@ -992,3 +996,31 @@ class ServiceScope(ServiceProvider):
         self._singleton_instances = root_provider._singleton_instances
         # New empty dict for scoped instances in this scope
         self._scoped_instances: Dict[Type, Any] = {}
+
+class ScopeFactory:
+    """Factory for creating and managing service scopes."""
+    
+    def __init__(self, provider: ServiceProvider):
+        self.provider = provider
+    
+    def create_scope(self) -> ServiceProvider:
+        """Create a new service scope."""
+        return self.provider.create_scope()
+    
+    class ScopeContext:
+        """Context manager for service scopes."""
+        def __init__(self, factory: 'ScopeFactory'):
+            self.factory = factory
+            self.scope = None
+            
+        def __enter__(self) -> ServiceProvider:
+            self.scope = self.factory.create_scope()
+            return self.scope
+            
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            # Clean up any resources if needed
+            pass
+    
+    def create_scope_context(self):
+        """Create a scope that can be used as a context manager."""
+        return self.ScopeContext(self)

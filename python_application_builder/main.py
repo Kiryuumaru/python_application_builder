@@ -1,4 +1,4 @@
-from application_builder import ApplicationBuilder, Worker, TimedWorker, IConfiguration, ILogger
+from application_builder import ApplicationBuilder, Worker, TimedWorker, IConfiguration, ILogger, ServiceProvider, ScopeFactory
 import time
 
 class ProgramInfo:
@@ -19,7 +19,7 @@ class CustomWorker(Worker):
         self.logger.info(f"Starting custom worker for {self.program_info.app_name}")
         self.logger.info(f"Current time: {self.program_info.current_time}")
         self.logger.info(f"Current user: {self.program_info.current_user}")
-        
+
         counter = 0
         while not self.is_stopping():
             counter += 1
