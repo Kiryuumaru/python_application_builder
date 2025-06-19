@@ -11,8 +11,7 @@
     <OutputPath>.</OutputPath>
     <Name>PythonApplication3</Name>
     <RootNamespace>PythonApplication3</RootNamespace>
-    <InterpreterId>
-    </InterpreterId>
+    <InterpreterId>MSBuild|env|$(MSBuildProjectFullPath)</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,30 +22,22 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="application\animal\services\base_animal_service.py" />
-    <Compile Include="application\food\services\base_food_service.py" />
     <Compile Include="application_builder.py" />
-    <Compile Include="infrastructure\animal_samples\services\cat_service.py" />
-    <Compile Include="infrastructure\animal_samples\services\dog_service.py" />
-    <Compile Include="infrastructure\petfood\services\pet_food_service.py" />
     <Compile Include="main.py" />
-    <Compile Include="workers\main_worker.py" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="application\" />
-    <Folder Include="application\animal\" />
-    <Folder Include="application\animal\services\" />
-    <Folder Include="application\food\" />
-    <Folder Include="application\food\services\" />
-    <Folder Include="workers\" />
-    <Folder Include="infrastructure\" />
-    <Folder Include="infrastructure\petfood\" />
-    <Folder Include="infrastructure\petfood\services\" />
-    <Folder Include="infrastructure\animal_samples\" />
-    <Folder Include="infrastructure\animal_samples\services\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="requirements.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include="env\env\">
+      <Id>env</Id>
+      <Version>3.9</Version>
+      <Description>env (Python 3.9 (64-bit))</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+      <Architecture>X64</Architecture>
+    </Interpreter>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
