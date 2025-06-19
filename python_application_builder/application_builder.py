@@ -9,7 +9,7 @@ import time
 import loguru
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Union, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Union, Tuple, get_type_hints
 
 # Type variable for generic methods
 T = TypeVar('T')
@@ -639,27 +639,32 @@ class TimedWorker(Worker):
 class WorkerManager:
     """Manages the lifecycle of hosted services."""
     
-    def __init__(self):
-        self._services: List[IWorker] = []
+    def __init__(self, root_provider: 'ServiceProvider'):
+        self._services: List[Tuple[IWorker, 'ServiceProvider']] = []
         self._started = False
+        self._root_provider = root_provider
     
-    def add_service(self, service: IWorker) -> None:
+    def add_service(self, service_type: Type[IWorker]) -> None:
         """Adds a hosted service to be managed."""
-        self._services.append(service)
+        # Create a separate scope for each worker
+        scope = self._root_provider.create_scope()
+        service = scope.get_required_service(service_type)
+        
+        self._services.append((service, scope))
         if self._started:
             service.start()
     
     def start_all(self) -> None:
         """Starts all registered hosted services."""
         self._started = True
-        for service in self._services:
+        for service, _ in self._services:
             service.start()
     
     def stop_all(self) -> None:
         """Stops all registered hosted services."""
         self._started = False
         # Stop services in reverse order
-        for service in reversed(self._services):
+        for service, _ in reversed(self._services):
             try:
                 service.stop()
             except Exception:
@@ -697,18 +702,12 @@ class ApplicationBuilder:
     
     def __init__(self):
         self._descriptors: List[ServiceDescriptor] = []
-        self._hosted_service_manager = WorkerManager()
+        self._hosted_service_manager = None
         self._configuration_builder = ConfigurationBuilder()
         self._service_provider = None
         
         # Add environment variables by default
         self._configuration_builder.add_environment_variables()
-        
-        # Add default configuration values
-        self._configuration_builder.add_in_memory_collection({
-            "System:CurrentTime": "2025-06-19 08:03:52",
-            "UserDetails:Name": "Kiryuumaru"
-        })
     
     def add(self, descriptor: ServiceDescriptor) -> 'ApplicationBuilder':
         """Add a service descriptor to the collection."""
@@ -823,11 +822,8 @@ class ApplicationBuilder:
                 "Default"  # Default context, will be overridden in _create_instance
             ))
         
-        # Register the hosted service manager
-        self.add_singleton_instance(WorkerManager, self._hosted_service_manager)
-        
         # Create the service provider
-        provider = ServiceProvider(self._descriptors, self._hosted_service_manager)
+        provider = ServiceProvider(self._descriptors)
         
         # Discover and register hosted services
         if auto_start_hosted_services:
@@ -869,11 +865,11 @@ class ApplicationBuilder:
 class ServiceProvider:
     """Resolves services from the service collection, similar to C#'s IServiceProvider."""
     
-    def __init__(self, descriptors: List[ServiceDescriptor], hosted_service_manager: WorkerManager):
+    def __init__(self, descriptors: List[ServiceDescriptor]):
         self._descriptors = descriptors
         self._singleton_instances: Dict[Type, Any] = {}
         self._scoped_instances: Dict[Type, Any] = {}
-        self._hosted_service_manager = hosted_service_manager
+        self._hosted_service_manager = None  # Initialize to None
         
         # Register self as ServiceProvider
         self._singleton_instances[ServiceProvider] = self
@@ -908,14 +904,14 @@ class ServiceProvider:
             return descriptor.instance
         
         if descriptor.lifetime == ServiceLifetime.SINGLETON:
-            if descriptor.service_type not in self._singleton_instances:
-                self._singleton_instances[descriptor.service_type] = self._create_instance(descriptor)
-            return self._singleton_instances[descriptor.service_type]
+            if descriptor.implementation_type not in self._singleton_instances:
+                self._singleton_instances[descriptor.implementation_type] = self._create_instance(descriptor)
+            return self._singleton_instances[descriptor.implementation_type]
         
         elif descriptor.lifetime == ServiceLifetime.SCOPED:
-            if descriptor.service_type not in self._scoped_instances:
-                self._scoped_instances[descriptor.service_type] = self._create_instance(descriptor)
-            return self._scoped_instances[descriptor.service_type]
+            if descriptor.implementation_type not in self._scoped_instances:
+                self._scoped_instances[descriptor.implementation_type] = self._create_instance(descriptor)
+            return self._scoped_instances[descriptor.implementation_type]
         
         else:  # TRANSIENT
             return self._create_instance(descriptor)
@@ -967,15 +963,25 @@ class ServiceProvider:
     
     def start_hosted_services(self) -> None:
         """Discover and start all hosted services."""
-        hosted_services = self.get_services(IWorker)
-        for service in hosted_services:
-            self._hosted_service_manager.add_service(service)
+        # Initialize worker manager if not already done
+        if self._hosted_service_manager is None:
+            self._hosted_service_manager = WorkerManager(self)
+            
+        worker_types = []
+        for descriptor in self._descriptors:
+            if (descriptor.service_type == IWorker or 
+                (descriptor.implementation_type and issubclass(descriptor.implementation_type, IWorker))):
+                worker_types.append(descriptor.implementation_type)
+        
+        for worker_type in worker_types:
+            self._hosted_service_manager.add_service(worker_type)
         
         self._hosted_service_manager.start_all()
     
     def stop_hosted_services(self) -> None:
         """Stop all running hosted services."""
-        self._hosted_service_manager.stop_all()
+        if self._hosted_service_manager:
+            self._hosted_service_manager.stop_all()
 
 class ServiceScope(ServiceProvider):
     """Represents a scope for scoped services."""
@@ -984,6 +990,5 @@ class ServiceScope(ServiceProvider):
         # Share descriptors and singleton instances with parent provider
         self._descriptors = root_provider._descriptors
         self._singleton_instances = root_provider._singleton_instances
-        self._hosted_service_manager = root_provider._hosted_service_manager
         # New empty dict for scoped instances in this scope
         self._scoped_instances: Dict[Type, Any] = {}

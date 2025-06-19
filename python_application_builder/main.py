@@ -1,20 +1,24 @@
 from application_builder import ApplicationBuilder, Worker, TimedWorker, IConfiguration, ILogger
 import time
 
-# Define a custom worker
-class CustomWorker(Worker):
-    def __init__(self, config: IConfiguration, logger: ILogger):
-        super().__init__()
-        self.config = config
-        self.logger = logger
+class ProgramInfo:
+    def __init__(self, config: IConfiguration):
         self.app_name = config.get("App:Name", "Unknown Application")
         self.current_time = config.get("System:CurrentTime", "Unknown Time")
         self.current_user = config.get("UserDetails:Name", "Unknown User")
+
+# Define a custom worker
+class CustomWorker(Worker):
+    def __init__(self, config: IConfiguration, logger: ILogger, program_info: ProgramInfo):
+        super().__init__()
+        self.config = config
+        self.logger = logger
+        self.program_info = program_info
     
     def execute(self) -> None:
-        self.logger.info(f"Starting custom worker for {self.app_name}")
-        self.logger.info(f"Current time: {self.current_time}")
-        self.logger.info(f"Current user: {self.current_user}")
+        self.logger.info(f"Starting custom worker for {self.program_info.app_name}")
+        self.logger.info(f"Current time: {self.program_info.current_time}")
+        self.logger.info(f"Current user: {self.program_info.current_user}")
         
         counter = 0
         while not self.is_stopping():
@@ -31,10 +35,11 @@ class CustomWorker(Worker):
 
 
 class CustomTimedWorker(TimedWorker):
-    def __init__(self, config: IConfiguration, logger: ILogger):
+    def __init__(self, config: IConfiguration, logger: ILogger, program_info: ProgramInfo):
         super().__init__(interval_seconds=1)
         self.config = config
         self.logger = logger
+        self.program_info = program_info
         self.counter = 0
     
     def do_work(self) -> None:
@@ -59,6 +64,7 @@ def main():
     })
     
     # Add our custom worker
+    app.add_transient(ProgramInfo)
     app.add_worker(CustomWorker)
     app.add_worker(CustomTimedWorker)
     
