@@ -1,434 +1,625 @@
 ﻿# Python Application Builder
 
-A lightweight dependency injection framework for Python applications that provides service management, factory patterns, worker threading, and comprehensive logging capabilities.
+A lightweight dependency injection framework for Python applications that provides service management, configuration handling, worker threading, and structured logging capabilities. Inspired by .NET's host builder pattern.
+
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ## 🚀 Features
 
-- **Dependency Injection**: Clean, testable code with automatic dependency resolution
-- **Service Management**: Singleton services with automatic initialization
-- **Factory Pattern**: On-demand creation of transient objects with dependency context access
-- **Worker Threading**: Background task execution with built-in thread management
-- **Comprehensive Logging**: Beautiful, structured logging with loguru integration
-- **Configuration Management**: Environment variable integration and custom configuration
-- **Type Safety**: Full type hints and generic support
-- **Dependency Context**: Factory functions have access to the full DI container
+- **💉 Dependency Injection**: Complete IoC container with automatic dependency resolution
+- **⚙️ Service Lifetimes**: Singleton, Scoped, and Transient service management
+- **🏗️ Configuration System**: Multi-source configuration (environment, JSON, in-memory)
+- **🧵 Worker Threading**: Background services with lifecycle management
+- **📊 Structured Logging**: Contextual logging with loguru integration
+- **🔧 Service Scoping**: Isolated service scopes for request-level dependencies
+- **🛡️ Type Safety**: Full type hints and generic support
 
 ## 📋 Table of Contents
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Architecture Overview](#architecture-overview)
 - [Core Concepts](#core-concepts)
+- [Configuration System](#configuration-system)
+- [Dependency Injection](#dependency-injection)
+- [Worker System](#worker-system)
 - [Usage Examples](#usage-examples)
 - [API Reference](#api-reference)
-- [Project Structure](#project-structure)
+- [Testing](#testing)
 - [Contributing](#contributing)
 
 ## 🔧 Installation
-
-### Prerequisites
-
-- Python 3.8 or higher
-
-### Install Dependencies
 
 ```bash
 pip install loguru
 ```
 
-Or using the requirements file:
-
-```bash
-pip install -r requirements.txt
-```
-
 ## 🏃 Quick Start
 
-Here's a simple example to get you started:
-
 ```python
-from application_builder import ApplicationBuilder, Dependency, Worker
+from python_application_builder import (
+    ApplicationBuilder, IConfiguration, ILogger, Worker
+)
 
-# 1. Define a service
-class GreetingService(Dependency):
-    def say_hello(self, name: str):
-        self.logger.info(f"Hello, {name}!")
-        return f"Hello, {name}!"
+class GreetingService:
+    def __init__(self, config: IConfiguration, logger: ILogger):
+        self.config = config
+        self.logger = logger
+        self.app_name = config.get("App:Name", "Demo App")
+    
+    def greet(self, name: str) -> str:
+        message = f"Hello, {name}! Welcome to {self.app_name}"
+        self.logger.info(message)
+        return message
 
-# 2. Define a worker
-class MainWorker(Worker):
-    def run(self):
-        greeting_service = self.get_service(GreetingService)
-        greeting_service.say_hello("World")
+class GreetingWorker(Worker):
+    def __init__(self, greeting_service: GreetingService, logger: ILogger):
+        super().__init__()
+        self.greeting_service = greeting_service
+        self.logger = logger
+    
+    def execute(self):
+        self.greeting_service.greet("World")
 
-# 3. Build and run the application
-app_builder = ApplicationBuilder()
-app_builder.add_service(GreetingService)
-app_builder.add_worker(MainWorker)
-app_builder.run()
+def main():
+    app = ApplicationBuilder()
+    app.add_configuration_dictionary({"App": {"Name": "My App"}})
+    app.add_singleton(GreetingService)
+    app.add_worker(GreetingWorker)
+    app.run()
+
+if __name__ == "__main__":
+    main()
+```
+
+## 🏗️ Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Layer                        │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
+│  │    Workers      │  │    Services     │  │ Controllers  │ │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                 Dependency Injection Core                   │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
+│  │ Service Provider│  │ Service Scopes  │  │   Service    │ │
+│  │   (Container)   │  │   (Isolation)   │  │  Lifetimes   │ │
+│  └─────────────────┘  └─────────────────┘  └──────────────┘ │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## 🎯 Core Concepts
 
-### Dependency Injection
-
-The framework uses dependency injection to manage object creation and lifetime. Dependencies are automatically resolved and injected when needed.
-
-### Services (Singletons)
-
-Services are singleton objects that live for the entire application lifetime. They're created once during application startup and reused throughout the application.
+### Service Lifetimes
 
 ```python
-# Register a service
-app_builder.add_service(PostgreSQLDatabaseService)
+# Singleton - One instance for entire application
+app.add_singleton(DatabaseService)
 
-# Use the service in any dependency
-db_service = self.get_service(BaseDatabaseService)  # Gets the PostgreSQL implementation
+# Scoped - One instance per scope
+app.add_scoped(RequestContextService)
+
+# Transient - New instance every time
+app.add_transient(EmailMessage)
 ```
 
-### Factories (On-Demand Creation)
-
-Factories create new instances every time they're called. Factory functions now receive a `dependency_context` parameter that provides access to services, configurations, and other factories.
+### Service Registration
 
 ```python
-# Register a factory
-app_builder.add_factory(EmailMessage)
+# By type
+app.add_singleton(EmailService)
 
-# Create new instances with full DI support
-factory = self.get_factory(EmailMessage)
-email1 = factory.create()  # New instance with logger and DI
-email2 = factory.create()  # Another new instance with logger and DI
+# By interface and implementation
+app.add_singleton(IEmailService, EmailService)
+
+# By factory
+app.add_singleton_factory(IEmailService, 
+    lambda provider: EmailService(provider.get_required_service(IConfiguration)))
+
+# By instance
+app.add_singleton_instance(IEmailService, EmailService())
 ```
 
-### Workers (Runtime Loops)
+## ⚙️ Configuration System
 
-Workers run in separate threads and handle background tasks or main application logic. They have access to all registered services and factories.
+### Multi-Source Configuration
 
 ```python
-class BackgroundWorker(Worker):
-    def run(self):
-        db_service = self.get_service(BaseDatabaseService)
-        while True:
-            # Your background logic here
-            db_service.process_pending_records()
-            time.sleep(1)
+app = ApplicationBuilder()
+
+# Environment variables
+app.add_configuration(lambda builder: 
+    builder.add_environment_variables("MYAPP_"))
+
+# JSON file
+app.add_configuration(lambda builder: 
+    builder.add_json_file("appsettings.json"))
+
+# In-memory (highest priority)
+app.add_configuration_dictionary({
+    "Database": {"ConnectionString": "Server=localhost"},
+    "Logging": {"Level": "INFO", "File": "logs/app.log"}
+})
+```
+
+### Configuration Usage
+
+```python
+class DatabaseService:
+    def __init__(self, config: IConfiguration, logger: ILogger):
+        # Hierarchical access
+        db_config = config.get_section("Database")
+        self.connection_string = db_config.get("ConnectionString")
+        
+        # Type conversion
+        self.timeout = config.get_int("Database:Timeout", 30)
+        self.debug = config.get_bool("Debug:Enabled", False)
+        
+        # Lists and dictionaries
+        self.hosts = config.get_list("Security:AllowedHosts", [])
+        self.features = config.get_dict("Features", {})
+```
+
+## 💉 Dependency Injection
+
+### Automatic Constructor Injection
+
+```python
+class OrderService:
+    def __init__(self, 
+                 database: IDatabaseService,
+                 logger: ILogger,
+                 email_service: IEmailService):
+        self.database = database
+        self.logger = logger
+        self.email_service = email_service
+    
+    def process_order(self, order_data: dict):
+        self.logger.info(f"Processing order: {order_data['id']}")
+        self.database.save_order(order_data)
+        self.email_service.send_confirmation(order_data['email'])
+```
+
+### Interface-Based Development
+
+```python
+class IRepository(ABC):
+    @abstractmethod
+    def save(self, entity: dict) -> int: pass
+
+class SqlRepository(IRepository):
+    def __init__(self, config: IConfiguration, logger: ILogger):
+        self.config = config
+        self.logger = logger
+    
+    def save(self, entity: dict) -> int:
+        self.logger.info("Saving to SQL Server")
+        return 1
+
+# Register based on configuration
+database_type = os.getenv("DATABASE_TYPE", "sql")
+if database_type == "mongo":
+    app.add_singleton(IRepository, MongoRepository)
+else:
+    app.add_singleton(IRepository, SqlRepository)
+```
+
+## 🧵 Worker System
+
+### Background Workers
+
+```python
+class DataProcessingWorker(Worker):
+    def __init__(self, data_service: IDataService, logger: ILogger):
+        super().__init__()
+        self.data_service = data_service
+        self.logger = logger
+    
+    def execute(self):
+        self.logger.info("Worker started")
+        
+        while not self.is_stopping():
+            try:
+                batch = self.data_service.get_pending_batch(10)
+                if not batch:
+                    self.wait_for_stop(5.0)
+                    continue
+                
+                for item in batch:
+                    if self.is_stopping():
+                        break
+                    self.data_service.process_item(item)
+                
+            except Exception as e:
+                self.logger.error(f"Processing error: {e}")
+                self.wait_for_stop(10.0)
+```
+
+### Timed Workers
+
+```python
+class HealthCheckWorker(TimedWorker):
+    def __init__(self, health_service: IHealthService, logger: ILogger):
+        super().__init__(interval_seconds=30)  # Every 30 seconds
+        self.health_service = health_service
+        self.logger = logger
+    
+    def do_work(self):
+        status = self.health_service.check_all_systems()
+        if status.is_healthy:
+            self.logger.info("All systems healthy")
+        else:
+            self.logger.warning(f"Issues: {status.issues}")
 ```
 
 ## 📚 Usage Examples
 
-### Example 1: Basic Service Usage
+### Example 1: Web API Service
 
 ```python
-from application_builder import ApplicationBuilder, Dependency, Worker
+from abc import ABC, abstractmethod
 
-class ConfigService(Dependency):
-    def initialize(self):
-        self.app_name = self.get_configuration("APP_NAME", "MyApp")
-        self.logger.info(f"Initialized {self.app_name}")
+# Interfaces
+class IUserRepository(ABC):
+    @abstractmethod
+    def create_user(self, user_data: dict) -> int: pass
 
-class AppWorker(Worker):
-    def run(self):
-        config = self.get_service(ConfigService)
-        self.logger.info(f"Running {config.app_name}")
+class IEmailService(ABC):
+    @abstractmethod
+    def send_welcome_email(self, email: str, name: str): pass
 
-# Setup
-app_builder = ApplicationBuilder()
-app_builder.add_configuration("APP_NAME", "Python Builder")
-app_builder.add_service(ConfigService)
-app_builder.add_worker(AppWorker)
-app_builder.run()
-```
+# Business Logic
+class UserService:
+    def __init__(self, user_repo: IUserRepository, email_service: IEmailService, logger: ILogger):
+        self.user_repo = user_repo
+        self.email_service = email_service
+        self.logger = logger
+    
+    def register_user(self, user_data: dict) -> dict:
+        user_id = self.user_repo.create_user(user_data)
+        self.email_service.send_welcome_email(user_data['email'], user_data['name'])
+        return {"id": user_id, "status": "registered"}
 
-### Example 2: Interface-Based Services
-
-```python
-from application_builder import ApplicationBuilder, Dependency, Worker
-from typing import Dict, Any
-
-# Define interface
-class BaseDatabaseService(Dependency):
-    def save(self, table: str, data: Dict[str, Any]) -> int:
-        raise NotImplementedError()
-
-# Implementations
-class PostgreSQLService(BaseDatabaseService):
-    def save(self, table: str, data: Dict[str, Any]) -> int:
-        self.logger.info(f"PostgreSQL save: {table}")
+# Infrastructure
+class SqlUserRepository(IUserRepository):
+    def __init__(self, config: IConfiguration, logger: ILogger):
+        self.connection_string = config.get("Database:ConnectionString")
+        self.logger = logger
+    
+    def create_user(self, user_data: dict) -> int:
+        self.logger.info(f"Saving user: {user_data['email']}")
         return 123
 
-class MongoDBService(BaseDatabaseService):
-    def save(self, table: str, data: Dict[str, Any]) -> int:
-        self.logger.info(f"MongoDB save: {table}")
-        return 456
-
-class DataWorker(Worker):
-    def run(self):
-        db = self.get_service(BaseDatabaseService)
-        db.save("users", {"name": "Alice", "timestamp": "2025-06-18 19:05:13"})
-
-# Setup - switch PostgreSQLService to MongoDBService as needed
-app_builder = ApplicationBuilder()
-app_builder.add_service(PostgreSQLService)
-app_builder.add_worker(DataWorker)
-app_builder.run()
-```
-
-### Example 3: Multiple Services with Keys
-
-```python
-from application_builder import ApplicationBuilder, Dependency, Worker
-
-class CacheService(Dependency):
-    def __init__(self):
-        self.data = {}
+class SmtpEmailService(IEmailService):
+    def __init__(self, config: IConfiguration, logger: ILogger):
+        self.smtp_host = config.get("Email:SmtpHost")
+        self.logger = logger
     
-    def set(self, key: str, value):
-        self.data[key] = value
-        self.logger.info(f"[{self._dependency_local_key}] Cached: {key}")
-
-class CacheWorker(Worker):
-    def run(self):
-        user_cache = self.get_service(CacheService, "users")
-        session_cache = self.get_service(CacheService, "sessions")
-        
-        user_cache.set("user:123", {"name": "Alice"})
-        session_cache.set("session:abc", {"user_id": 123})
+    def send_welcome_email(self, email: str, name: str):
+        self.logger.info(f"Sending welcome email to: {email}")
 
 # Setup
-app_builder = ApplicationBuilder()
-app_builder.add_service(CacheService, "users")
-app_builder.add_service(CacheService, "sessions")
-app_builder.add_worker(CacheWorker)
-app_builder.run()
+def create_app():
+    app = ApplicationBuilder()
+    app.add_configuration_dictionary({
+        "Database": {"ConnectionString": "Server=localhost"},
+        "Email": {"SmtpHost": "smtp.gmail.com"}
+    })
+    app.add_singleton(IUserRepository, SqlUserRepository)
+    app.add_singleton(IEmailService, SmtpEmailService)
+    app.add_singleton(UserService)
+    return app.build()
+
+# Usage in web framework
+service_provider = create_app()
+
+def register_endpoint(user_data: dict):
+    scope_factory = service_provider.get_required_service(ScopeFactory)
+    with scope_factory.create_scope_context() as scope:
+        user_service = scope.get_required_service(UserService)
+        return user_service.register_user(user_data)
 ```
 
-### Example 4: Configuration-Driven Selection
+### Example 2: Data Pipeline
 
 ```python
-from application_builder import ApplicationBuilder, Dependency, Worker, DependencyCore
+# Pipeline Components
+class IDataSource(ABC):
+    @abstractmethod
+    def get_next_batch(self, size: int) -> list: pass
 
-class BaseStorageService(Dependency):
-    def store(self, filename: str) -> str:
-        raise NotImplementedError()
+class IDataProcessor(ABC):
+    @abstractmethod
+    def process(self, data: dict) -> dict: pass
 
-class LocalStorageService(BaseStorageService):
-    def store(self, filename: str) -> str:
-        path = f"./storage/{filename}"
-        self.logger.info(f"Stored locally: {path}")
-        return path
+class FileDataSource(IDataSource):
+    def __init__(self, config: IConfiguration, logger: ILogger):
+        self.file_path = config.get("Pipeline:SourceFile")
+        self.logger = logger
+        self.position = 0
+    
+    def get_next_batch(self, size: int) -> list:
+        batch = [{"id": i, "data": f"record_{i}"} for i in range(self.position, self.position + size)]
+        self.position += size
+        return batch if self.position < 1000 else []
 
-class CloudStorageService(BaseStorageService):
-    def store(self, filename: str) -> str:
-        url = f"https://cloud.com/{filename}"
-        self.logger.info(f"Stored in cloud: {url}")
-        return url
+class DataTransformProcessor(IDataProcessor):
+    def process(self, data: dict) -> dict:
+        return {
+            "id": data["id"],
+            "processed_data": data["data"].upper(),
+            "timestamp": time.time()
+        }
 
-class StorageWorker(Worker):
-    def run(self):
-        factory = self.get_factory(BaseStorageService)
-        storage = factory.create()
-        storage.store("document.txt")
+# Pipeline Worker
+class PipelineWorker(Worker):
+    def __init__(self, source: IDataSource, processor: IDataProcessor, logger: ILogger):
+        super().__init__()
+        self.source = source
+        self.processor = processor
+        self.logger = logger
+    
+    def execute(self):
+        while not self.is_stopping():
+            batch = self.source.get_next_batch(10)
+            if not batch:
+                break
+            
+            for item in batch:
+                processed = self.processor.process(item)
+                self.logger.debug(f"Processed: {processed['id']}")
 
-def create_storage(dependency_context: DependencyCore):
-    # Environment variables are automatically available via get_configuration
-    storage_type = dependency_context.get_configuration("STORAGE_TYPE", "local")
-    if storage_type == "local":
-        return LocalStorageService()
-    else:
-        return CloudStorageService()
+# Setup
+def main():
+    app = ApplicationBuilder()
+    app.add_configuration_dictionary({"Pipeline": {"SourceFile": "data.json"}})
+    app.add_singleton(IDataSource, FileDataSource)
+    app.add_singleton(IDataProcessor, DataTransformProcessor)
+    app.add_worker(PipelineWorker)
+    app.run()
+```
 
-app_builder = ApplicationBuilder()
-app_builder.add_factory(BaseStorageService, custom_factory=create_storage)
-app_builder.add_worker(StorageWorker)
+### Example 3: Health Monitoring
 
-# Run with: STORAGE_TYPE=cloud python main.py
-app_builder.run()
+```python
+from enum import Enum
+
+class HealthStatus(Enum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
+
+class HealthCheckResult:
+    def __init__(self, name: str, status: HealthStatus, message: str = ""):
+        self.name = name
+        self.status = status
+        self.message = message
+
+class DatabaseHealthCheck:
+    def __init__(self, config: IConfiguration, logger: ILogger):
+        self.connection_string = config.get("Database:ConnectionString")
+        self.logger = logger
+    
+    def check_health(self) -> HealthCheckResult:
+        try:
+            # Simulate database check
+            return HealthCheckResult("database", HealthStatus.HEALTHY, "OK")
+        except Exception as e:
+            return HealthCheckResult("database", HealthStatus.UNHEALTHY, str(e))
+
+class HealthMonitorWorker(TimedWorker):
+    def __init__(self, db_check: DatabaseHealthCheck, logger: ILogger):
+        super().__init__(interval_seconds=15)
+        self.db_check = db_check
+        self.logger = logger
+    
+    def do_work(self):
+        result = self.db_check.check_health()
+        if result.status == HealthStatus.HEALTHY:
+            self.logger.info(f"{result.name}: {result.message}")
+        else:
+            self.logger.error(f"{result.name}: {result.message}")
+
+# Setup
+def main():
+    app = ApplicationBuilder()
+    app.add_singleton(DatabaseHealthCheck)
+    app.add_worker(HealthMonitorWorker)
+    app.run()
 ```
 
 ## 📖 API Reference
 
 ### ApplicationBuilder
 
-The main builder class for configuring the application.
-
-#### Constructor
-
 ```python
-ApplicationBuilder(log_dir: str = os.path.join(os.getcwd(), "logs"))
-```
-
-#### Methods
-
-- `add_service(service_type, local_key=None, name=None)`: Register a singleton service
-- `add_factory(factory_type, local_key=None, name=None, custom_factory=None)`: Register a factory
-- `add_worker(worker_type, name=None)`: Register a worker
-- `add_configuration(key, value)`: Add a configuration value
-- `run()`: Start the application
-
-### DependencyCore
-
-Base class that provides dependency injection functionality.
-
-#### Methods
-
-- `get_service(service_type, local_key=None)`: Get a service instance
-- `get_services(service_type)`: Get all services of a type
-- `get_factory(factory_type, local_key=None)`: Get a factory instance
-- `get_factories(factory_type)`: Get all factories of a type
-- `get_configuration(key, default=None)`: Get a configuration value
-
-### Dependency
-
-Base class for all injectable components (inherits from DependencyCore).
-
-#### Methods
-
-- `initialize()`: Override for custom initialization logic
-
-#### Properties
-
-- `logger`: Loguru logger instance bound to the dependency context
-- `_dependency_name`: The name of the dependency
-- `_dependency_local_key`: The local key used for registration
-- `_dependency_keys`: List of all type keys this dependency is registered under
-
-### Worker
-
-Base class for worker components that run in separate threads.
-
-#### Methods
-
-- `run()`: Override with your worker logic (required)
-
-### DependencyFactory
-
-Factory class for creating dependency instances with full DI support.
-
-#### Methods
-
-- `create()`: Create a new instance of the dependency with proper DI wiring
-
-### Custom Factory Functions
-
-Custom factory functions now receive a `dependency_context` parameter:
-
-```python
-def my_custom_factory(dependency_context: DependencyCore) -> MyService:
-    # Access services, configurations, and factories
-    config_value = dependency_context.get_configuration("MY_CONFIG")
-    other_service = dependency_context.get_service(OtherService)
+class ApplicationBuilder:
+    # Service registration
+    def add_singleton(self, service_type: Type[T], impl_type: Type = None) -> 'ApplicationBuilder'
+    def add_scoped(self, service_type: Type[T], impl_type: Type = None) -> 'ApplicationBuilder'
+    def add_transient(self, service_type: Type[T], impl_type: Type = None) -> 'ApplicationBuilder'
+    def add_singleton_factory(self, service_type: Type[T], factory: Callable) -> 'ApplicationBuilder'
+    def add_singleton_instance(self, service_type: Type[T], instance: T) -> 'ApplicationBuilder'
     
-    service = MyService()
-    service.config = config_value
-    return service
+    # Worker registration
+    def add_worker(self, worker_type: Type[IWorker]) -> 'ApplicationBuilder'
+    
+    # Configuration
+    def add_configuration_dictionary(self, config: Dict[str, Any]) -> 'ApplicationBuilder'
+    def add_configuration(self, configure: Callable[[ConfigurationBuilder], None]) -> 'ApplicationBuilder'
+    
+    # Build and run
+    def build(self, auto_start_workers: bool = True) -> 'ServiceProvider'
+    def run(self) -> None
 ```
 
-## 🏗️ Project Structure
-
-```
-python_application_builder/
-├── application_builder.py          # Core framework classes
-├── main.py                         # Application entry point
-├── requirements.txt                # Dependencies
-├── workers/
-│   └── main_worker.py              # Main application worker
-├── application/                    # Application layer (interfaces/contracts)
-│   ├── database/
-│   │   └── services/
-│   │       └── base_database_service.py
-│   └── storage/
-│       └── services/
-│           └── base_storage_service.py
-└── infrastructure/                 # Infrastructure layer (implementations)
-    ├── database/
-    │   └── services/
-    │       ├── postgresql_database_service.py
-    │       └── mongodb_database_service.py
-    └── storage/
-        └── services/
-            ├── local_storage_service.py
-            └── cloud_storage_service.py
-```
-
-### Architecture Benefits
-
-1. **Testability**: Easy to mock services and factories for unit tests
-2. **Flexibility**: Switch implementations without changing business logic
-3. **Scalability**: Add new implementations by extending base interfaces
-4. **Separation of Concerns**: Business logic depends on abstractions, not concrete implementations
-5. **Factory Context**: Custom factories can access the full DI container
-
-## 🔍 Advanced Features
-
-### Dependency Context in Factories
-
-Factory functions receive a `DependencyCore` parameter that provides access to:
-- Configuration values via `get_configuration()`
-- Registered services via `get_service()` and `get_services()`
-- Other factories via `get_factory()` and `get_factories()`
-
-### Automatic Base Class Registration
-
-Dependencies are automatically registered for all their base classes:
+### ServiceProvider
 
 ```python
-# Register concrete implementation
-app_builder.add_service(PostgreSQLDatabaseService)
-
-# Retrieve by interface
-db_service = self.get_service(BaseDatabaseService)  # Gets PostgreSQL implementation
+class ServiceProvider:
+    def get_service(self, service_type: Type[T]) -> Optional[T]
+    def get_required_service(self, service_type: Type[T]) -> T
+    def get_services(self, service_type: Type[T]) -> List[T]
+    def create_scope(self) -> 'ServiceProvider'
 ```
 
-### Environment Variable Integration
-
-All environment variables are automatically loaded as configurations when the application starts. You can access them directly via `get_configuration()` without manually adding them:
+### Configuration Interfaces
 
 ```python
-class DatabaseService(Dependency):
-    def initialize(self):
-        # Environment variables are automatically available
-        self.host = self.get_configuration("DB_HOST", "localhost")
-        self.port = self.get_configuration("DB_PORT", "5432")
-        self.user = self.get_configuration("DB_USER", "admin")
+class IConfiguration:
+    def get(self, key: str, default: Any = None) -> Any
+    def get_int(self, key: str, default: Optional[int] = None) -> Optional[int]
+    def get_bool(self, key: str, default: Optional[bool] = None) -> Optional[bool]
+    def get_list(self, key: str, default: Optional[List] = None) -> Optional[List]
+    def get_dict(self, key: str, default: Optional[Dict] = None) -> Optional[Dict]
+    def get_section(self, key: str) -> 'IConfigurationSection'
 ```
 
-### Thread-Safe Logging with Context
+### Worker Base Classes
 
-Each dependency gets its own logger with colored output and automatic file rotation.
+```python
+class Worker:
+    def start(self) -> None
+    def stop(self) -> None
+    def is_stopping(self) -> bool
+    def wait_for_stop(self, timeout: float = None) -> bool
+    
+    @abstractmethod
+    def execute(self) -> None
+
+class TimedWorker(Worker):
+    def __init__(self, interval_seconds: float = 5)
+    
+    @abstractmethod
+    def do_work(self) -> None
+```
 
 ## 🧪 Testing
 
-Services and factories can be easily mocked for testing:
+### Unit Testing
 
 ```python
-from application_builder import DependencyCore
+import unittest
+from unittest.mock import Mock
 
-class MockStorageService(BaseStorageService):
-    def store(self, filename: str) -> str:
-        return f"mock://{filename}"
-
-def mock_storage_factory(dependency_context: DependencyCore):
-    return MockStorageService()
-
-# Use in tests
-app_builder = ApplicationBuilder()
-app_builder.add_factory(BaseStorageService, custom_factory=mock_storage_factory)
+class TestUserService(unittest.TestCase):
+    def setUp(self):
+        self.mock_repo = Mock()
+        self.mock_email = Mock()
+        self.mock_logger = Mock()
+        
+        self.user_service = UserService(
+            self.mock_repo, self.mock_email, self.mock_logger
+        )
+    
+    def test_register_user(self):
+        # Arrange
+        self.mock_repo.create_user.return_value = 123
+        user_data = {"name": "John", "email": "john@test.com"}
+        
+        # Act
+        result = self.user_service.register_user(user_data)
+        
+        # Assert
+        self.assertEqual(result["id"], 123)
+        self.mock_repo.create_user.assert_called_once()
+        self.mock_email.send_welcome_email.assert_called_once()
 ```
 
-## 🚀 Performance Considerations
+### Integration Testing
 
-- **Services**: Initialized once at startup - use for expensive resources
-- **Factories**: Create instances on-demand with dependency context access
-- **Workers**: Run in separate threads - design for thread safety
-- **Logging**: Asynchronous with automatic rotation - minimal performance impact
-- **Dependency Context**: Provides efficient access to DI container in factory functions
+```python
+class TestIntegration(unittest.TestCase):
+    def setUp(self):
+        self.app = ApplicationBuilder()
+        self.app.add_configuration_dictionary({"Database": {"ConnectionString": "test"}})
+        self.app.add_singleton(IUserRepository, InMemoryUserRepository)
+        self.app.add_singleton(UserService)
+        self.provider = self.app.build()
+    
+    def test_user_service_integration(self):
+        user_service = self.provider.get_required_service(UserService)
+        result = user_service.register_user({"name": "Jane", "email": "jane@test.com"})
+        self.assertIsNotNone(result["id"])
+```
+
+## 🚀 Advanced Features
+
+### Service Scoping
+
+```python
+scope_factory = service_provider.get_required_service(ScopeFactory)
+with scope_factory.create_scope_context() as scope:
+    scoped_service = scope.get_required_service(IScopedService)
+    # All scoped services share instances within this context
+```
+
+### Factory Pattern
+
+```python
+def create_storage_service(provider: ServiceProvider) -> IStorageService:
+    config = provider.get_required_service(IConfiguration)
+    storage_type = config.get("Storage:Type", "local")
+    
+    if storage_type == "cloud":
+        return CloudStorageService(config)
+    return LocalStorageService(config)
+
+app.add_singleton_factory(IStorageService, create_storage_service)
+```
+
+### Configuration Reload
+
+```python
+class ConfigurableService:
+    def __init__(self, config: IConfiguration):
+        self.config = config
+        self.update_settings()
+    
+    def update_settings(self):
+        self.timeout = self.config.get_int("Service:Timeout", 5000)
+    
+    def reload_config(self):
+        self.config.reload()
+        self.update_settings()
+```
+
+## ✅ Best Practices
+
+```python
+# ✅ Good: Interface-based design
+class IEmailService(ABC):
+    @abstractmethod
+    def send_email(self, to: str, subject: str, body: str) -> bool: pass
+
+# ✅ Good: Proper error handling in workers
+class RobustWorker(Worker):
+    def execute(self):
+        while not self.is_stopping():
+            try:
+                self.do_work()
+            except Exception as e:
+                self.logger.error(f"Worker error: {e}")
+                self.wait_for_stop(5.0)
+
+# ✅ Good: Hierarchical configuration
+{"Database": {"Primary": {"ConnectionString": "..."}}}
+
+# ❌ Bad: Flat configuration
+{"DatabasePrimaryConnectionString": "..."}
+```
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make changes with tests
+4. Commit changes (`git commit -m 'Add amazing feature'`)
+5. Push to branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
 ### Development Setup
 
@@ -436,26 +627,19 @@ app_builder.add_factory(BaseStorageService, custom_factory=mock_storage_factory)
 git clone https://github.com/Kiryuumaru/python_application_builder.git
 cd python_application_builder
 pip install -r requirements.txt
+python python_application_builder/main.py
 ```
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Built with [loguru](https://github.com/Delgan/loguru) for excellent logging capabilities
-- Inspired by dependency injection frameworks from other languages
-- Thanks to the Python community for continuous inspiration
-
-## 📞 Support
-
-If you encounter any issues or have questions:
-
-1. Check the [Issues](https://github.com/Kiryuumaru/python_application_builder/issues) page
-2. Create a new issue with a detailed description
-3. Provide code examples and error messages when possible
+- **[loguru](https://github.com/Delgan/loguru)** - Excellent logging
+- **.NET Core** - DI and host builder pattern inspiration
+- **Python Community** - Continuous inspiration
 
 ---
 
-**Happy coding! 🐍✨**
+**Built with ❤️ for the Python community! 🐍✨**
