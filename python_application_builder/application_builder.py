@@ -1024,10 +1024,6 @@ class ScopeFactory:
     def __init__(self, provider: ServiceProvider):
         self.provider = provider
 
-    def create_scope(self) -> ServiceProvider:
-        """Create a new service scope."""
-        return self.provider.create_scope()
-
     class ScopeContext:
         """Context manager for service scopes."""
         def __init__(self, factory: 'ScopeFactory'):
@@ -1035,13 +1031,13 @@ class ScopeFactory:
             self.scope = None
 
         def __enter__(self) -> ServiceProvider:
-            self.scope = self.factory.create_scope()
+            self.scope = self.factory.provider.create_scope()
             return self.scope
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             # Clean up any resources if needed
             pass
 
-    def create_scope_context(self):
+    def create_scope_context(self) -> ServiceProvider:
         """Create a scope that can be used as a context manager."""
         return self.ScopeContext(self)
