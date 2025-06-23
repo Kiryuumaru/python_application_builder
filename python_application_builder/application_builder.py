@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 import loguru
+import threading
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Union, Tuple, get_type_hints
@@ -14,21 +15,24 @@ from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Unio
 # Type variable for generic methods
 T = TypeVar('T')
 
+_loguru_logger_lock = threading.Lock()
+
 def create_loguru_logger(context, log_level, log_file):
     log_format = '<fg 95,95,95>{time}</> <level>{level: <8}</> - [<fg 95,95,95>{extra[context]}</>] <level>{message}</>'
-    logger = loguru.logger.bind(context=context)
-    logger.level("TRACE", color="<fg #444444>")
-    logger.level("DEBUG", color="<fg #666666>")
-    logger.level("INFO", color="<fg #FFFFFF>")
-    logger.level("SUCCESS", color="<fg #00CC99>")
-    logger.level("WARNING", color="<fg #FFBB00>")
-    logger.level("ERROR", color="<fg #FF4444>")
-    logger.level("CRITICAL", color="<fg #FF00FF>")
-    logger.remove()
-    logger.add(sys.stdout, colorize=True, format=log_format, level=log_level)
-    if log_file:
-        logger.add(log_file, rotation="10 MB", level=log_level, format=log_format)
-    return logger
+    with _loguru_logger_lock:
+        logger = loguru.logger.bind(context=context)
+        logger.level("TRACE", color="<fg #444444>")
+        logger.level("DEBUG", color="<fg #666666>")
+        logger.level("INFO", color="<fg #FFFFFF>")
+        logger.level("SUCCESS", color="<fg #00CC99>")
+        logger.level("WARNING", color="<fg #FFBB00>")
+        logger.level("ERROR", color="<fg #FF4444>")
+        logger.level("CRITICAL", color="<fg #FF00FF>")
+        logger.remove()
+        logger.add(sys.stdout, colorize=True, format=log_format, level=log_level)
+        if log_file:
+            logger.add(log_file, rotation="10 MB", level=log_level, format=log_format)
+        return logger
 
 logger = create_loguru_logger("Default", "TRACE", None)
 
