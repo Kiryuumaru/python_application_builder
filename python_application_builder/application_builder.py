@@ -8,7 +8,7 @@ import loguru
 import threading
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Union, Tuple, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Union, Tuple, get_type_hints, get_origin, get_args
 
 # Type variable for generic methods
 T = TypeVar('T')
@@ -767,7 +767,7 @@ class ApplicationBuilder:
             lifetime=ServiceLifetime.SCOPED
         ))
 
-    def add_scoped_factory(self, service_type: Type[T], factory: Callable[['ServiceProvider'], T]) -> 'ApplicationBuilder':
+    def add_scoped_factory(self, service_type: Type[T], factory: Callable [['ServiceProvider'], T]) -> 'ApplicationBuilder':
         """Register a scoped service with a factory function."""
         return self.add(ServiceDescriptor(
             service_type=service_type,
@@ -783,7 +783,7 @@ class ApplicationBuilder:
             lifetime=ServiceLifetime.TRANSIENT
         ))
 
-    def add_transient_factory(self, service_type: Type[T], factory: Callable[['ServiceProvider'], T]) -> 'ApplicationBuilder':
+    def add_transient_factory(self, service_type: Type[T], factory: Callable [['ServiceProvider'], T]) -> 'ApplicationBuilder':
         """Register a transient service with a factory function."""
         return self.add(ServiceDescriptor(
             service_type=service_type,
@@ -965,16 +965,30 @@ class ServiceProvider:
 
             if param_name in param_types:
                 param_type = param_types[param_name]
-                dependency = self.get_service(param_type)
+                
+                # Check if parameter is List[T]
+                origin = get_origin(param_type)
+                if origin is list or origin is List:
+                    # Extract the generic type T from List[T]
+                    args = get_args(param_type)
+                    if args:
+                        service_type = args[0]
+                        # Get all services of this type
+                        dependency = self.get_services(service_type)
+                    else:
+                        dependency = []
+                else:
+                    # Regular single service resolution
+                    dependency = self.get_service(param_type)
 
-                # Set context for logger if it's being injected
-                if dependency is not None and param_type == ILogger and isinstance(dependency, LoguruLogger):
-                    # Use the class name as context
-                    class_name = implementation_type.__name__
-                    dependency = dependency.with_context(class_name)
+                    # Set context for logger if it's being injected
+                    if dependency is not None and param_type == ILogger and isinstance(dependency, LoguruLogger):
+                        # Use the class name as context
+                        class_name = implementation_type.__name__
+                        dependency = dependency.with_context(class_name)
 
-                if dependency is None and param.default is param.empty:
-                    raise ValueError(f"Cannot resolve parameter '{param_name}' of type {param_type} for {implementation_type.__name__}")
+                    if dependency is None and param.default is param.empty:
+                        raise ValueError(f"Cannot resolve parameter '{param_name}' of type {param_type} for {implementation_type.__name__}")
 
                 if dependency is not None:
                     dependencies[param_name] = dependency
