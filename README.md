@@ -38,7 +38,7 @@ pip install loguru
 ## 🏃 Quick Start
 
 ```python
-from python_application_builder import (
+from application_builder import (
     ApplicationBuilder, IConfiguration, ILogger, Worker
 )
 
@@ -627,7 +627,7 @@ class RobustWorker(Worker):
 git clone https://github.com/Kiryuumaru/python_application_builder.git
 cd python_application_builder
 pip install -r requirements.txt
-python python_application_builder/main.py
+python src/main.py
 ```
 
 ## 📄 License
