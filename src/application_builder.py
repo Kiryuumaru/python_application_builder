@@ -8,7 +8,7 @@ import time
 import uuid
 import loguru
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields as dataclass_fields, MISSING
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, TypeVar, Union, Tuple, get_type_hints, get_origin, get_args
@@ -202,6 +202,59 @@ class MemoryConfigurationProvider(ConfigurationProvider):
         self.data[key] = value
 
 
+class CommandLineConfigurationProvider(ConfigurationProvider):
+    """Configuration provider that reads from command-line arguments.
+
+    Supports formats:
+        --Key=Value
+        --Key Value
+        /Key=Value
+        /Key Value
+    """
+
+    def __init__(self, args: Optional[List[str]] = None, switch_mappings: Optional[Dict[str, str]] = None):
+        self._args = args if args is not None else sys.argv[1:]
+        self._switch_mappings = switch_mappings or {}
+
+    def load(self) -> Dict[str, str]:
+        """Parse command-line arguments into configuration key-value pairs."""
+        result: Dict[str, str] = {}
+        i = 0
+        args = self._args
+
+        while i < len(args):
+            arg = args[i]
+            key: Optional[str] = None
+            value: Optional[str] = None
+
+            if arg.startswith("--"):
+                raw = arg[2:]
+            elif arg.startswith("/"):
+                raw = arg[1:]
+            else:
+                i += 1
+                continue
+
+            if "=" in raw:
+                key, value = raw.split("=", 1)
+            else:
+                key = raw
+                if i + 1 < len(args) and not args[i + 1].startswith(("-", "/")):
+                    value = args[i + 1]
+                    i += 1
+                else:
+                    value = "true"
+
+            if key:
+                mapped = self._switch_mappings.get(f"--{key}", key)
+                mapped = mapped.replace("__", ":").replace("_", ":")
+                result[mapped] = value
+
+            i += 1
+
+        return result
+
+
 class ConfigurationBuilder:
     """Builder for creating Configuration instances."""
 
@@ -224,6 +277,11 @@ class ConfigurationBuilder:
     def add_in_memory_collection(self, initial_data: Dict[str, str] = None) -> 'ConfigurationBuilder':
         """Adds a configuration provider that reads from an in-memory dictionary."""
         return self.add_provider(MemoryConfigurationProvider(initial_data))
+
+    def add_command_line(self, args: Optional[List[str]] = None,
+                         switch_mappings: Optional[Dict[str, str]] = None) -> 'ConfigurationBuilder':
+        """Add a configuration provider that reads from command-line arguments."""
+        return self.add_provider(CommandLineConfigurationProvider(args, switch_mappings))
 
     def build(self) -> 'Configuration':
         """Builds a Configuration instance with the registered providers."""
@@ -472,6 +530,269 @@ class Configuration(IConfiguration):
 
 
 ###########################################
+# Options / Typed Configuration Binding
+###########################################
+
+
+def bind_configuration(config_section: IConfigurationSection, target_type: Type[T]) -> T:
+    """Bind a configuration section to a dataclass or plain class.
+
+    For dataclasses, reads fields and their types.
+    For plain classes, reads __init__ type hints.
+    Values are coerced to the annotated types.
+    """
+    if hasattr(target_type, '__dataclass_fields__'):
+        return _bind_dataclass(config_section, target_type)
+    return _bind_class(config_section, target_type)
+
+
+def _bind_dataclass(section: IConfigurationSection, cls: Type[T]) -> T:
+    kwargs: Dict[str, Any] = {}
+    for f in dataclass_fields(cls):
+        raw = section.get(f.name)
+        if raw is None:
+            if f.default is not MISSING:
+                kwargs[f.name] = f.default
+            elif f.default_factory is not MISSING:
+                kwargs[f.name] = f.default_factory()
+            continue
+        kwargs[f.name] = _coerce(raw, f.type)
+    return cls(**kwargs)
+
+
+def _bind_class(section: IConfigurationSection, cls: Type[T]) -> T:
+    hints = get_type_hints(cls.__init__) if hasattr(cls, '__init__') else {}
+    hints.pop('return', None)
+    kwargs: Dict[str, Any] = {}
+    for name, hint in hints.items():
+        raw = section.get(name)
+        if raw is not None:
+            kwargs[name] = _coerce(raw, hint)
+    return cls(**kwargs)
+
+
+def _coerce(value: str, target_type: Any) -> Any:
+    """Coerce a string value to the target type."""
+    if target_type is str or target_type == str:
+        return value
+    if target_type is int or target_type == int:
+        return int(value)
+    if target_type is float or target_type == float:
+        return float(value)
+    if target_type is bool or target_type == bool:
+        return value.lower() in ('true', 'yes', '1', 'on')
+    origin = get_origin(target_type)
+    if origin is list or origin is List:
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError):
+            return [v.strip() for v in value.split(',')]
+    if origin is dict or origin is Dict:
+        return json.loads(value)
+    return value
+
+
+class IOptions(ABC):
+    """Provides access to a typed configuration object. Singleton — read once at startup."""
+
+    @abstractmethod
+    def get_value(self) -> T:
+        """Get the options value."""
+
+
+class IOptionsSnapshot(ABC):
+    """Provides access to a typed configuration object. Scoped — re-read per scope creation."""
+
+    @abstractmethod
+    def get_value(self) -> T:
+        """Get the options value for the current scope."""
+
+
+class IOptionsMonitor(ABC):
+    """Provides access to a typed configuration object. Always reads latest config."""
+
+    @abstractmethod
+    def get_current_value(self) -> T:
+        """Get the current options value (re-reads config each call)."""
+
+    @abstractmethod
+    def on_change(self, callback: Callable[[T], None]) -> 'CancellationTokenRegistration':
+        """Register a callback for when the options change."""
+
+
+class _OptionsImpl:
+    """Singleton options — bound once at first access."""
+
+    def __init__(self, config: IConfiguration, section_key: str, options_type: Type):
+        self._config = config
+        self._section_key = section_key
+        self._options_type = options_type
+        self._value: Optional[Any] = None
+        self._lock = threading.Lock()
+
+    def get_value(self):
+        if self._value is None:
+            with self._lock:
+                if self._value is None:
+                    section = self._config.get_section(self._section_key)
+                    self._value = bind_configuration(section, self._options_type)
+        return self._value
+
+
+class _OptionsSnapshotImpl:
+    """Scoped options — bound fresh each time."""
+
+    def __init__(self, config: IConfiguration, section_key: str, options_type: Type):
+        self._config = config
+        self._section_key = section_key
+        self._options_type = options_type
+
+    def get_value(self):
+        section = self._config.get_section(self._section_key)
+        return bind_configuration(section, self._options_type)
+
+
+class _OptionsMonitorImpl:
+    """Monitors configuration changes and provides latest options."""
+
+    def __init__(self, config: IConfiguration, section_key: str, options_type: Type):
+        self._config = config
+        self._section_key = section_key
+        self._options_type = options_type
+        self._callbacks: List[Callable] = []
+        self._lock = threading.Lock()
+        self._last_value: Optional[Any] = None
+
+    def get_current_value(self):
+        section = self._config.get_section(self._section_key)
+        new_value = bind_configuration(section, self._options_type)
+        self._last_value = new_value
+        return new_value
+
+    def on_change(self, callback: Callable) -> 'CancellationTokenRegistration':
+        with self._lock:
+            self._callbacks.append(callback)
+
+        def unregister():
+            with self._lock:
+                if callback in self._callbacks:
+                    self._callbacks.remove(callback)
+
+        return CancellationTokenRegistration(unregister)
+
+    def _notify_change(self) -> None:
+        current = self.get_current_value()
+        with self._lock:
+            callbacks = self._callbacks.copy()
+        for cb in callbacks:
+            try:
+                cb(current)
+            except Exception:
+                pass
+
+
+###########################################
+# Configuration Change Tokens
+###########################################
+
+
+class IChangeToken(ABC):
+    """Propagates notifications that a change has occurred."""
+
+    @property
+    @abstractmethod
+    def has_changed(self) -> bool:
+        """Get whether a change has occurred."""
+
+    @abstractmethod
+    def register_change_callback(self, callback: Callable[[], None]) -> 'CancellationTokenRegistration':
+        """Register a callback for change notifications."""
+
+
+class ConfigurationChangeToken(IChangeToken):
+    """Change token backed by a threading Event."""
+
+    def __init__(self) -> None:
+        self._event = threading.Event()
+        self._callbacks: List[Callable[[], None]] = []
+        self._lock = threading.Lock()
+
+    @property
+    def has_changed(self) -> bool:
+        return self._event.is_set()
+
+    def register_change_callback(self, callback: Callable[[], None]) -> 'CancellationTokenRegistration':
+        with self._lock:
+            self._callbacks.append(callback)
+
+        def unregister():
+            with self._lock:
+                if callback in self._callbacks:
+                    self._callbacks.remove(callback)
+
+        return CancellationTokenRegistration(unregister)
+
+    def signal(self) -> None:
+        """Signal that a change has occurred."""
+        self._event.set()
+        with self._lock:
+            callbacks = self._callbacks.copy()
+        for cb in callbacks:
+            try:
+                cb()
+            except Exception:
+                pass
+
+
+class FileChangeWatcher:
+    """Watches a file for modifications and signals a change token."""
+
+    def __init__(self, file_path: str, poll_interval: float = 2.0):
+        self._file_path = file_path
+        self._poll_interval = poll_interval
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+        self._change_token = ConfigurationChangeToken()
+        self._last_mtime: Optional[float] = None
+        if os.path.exists(file_path):
+            self._last_mtime = os.path.getmtime(file_path)
+
+    @property
+    def change_token(self) -> ConfigurationChangeToken:
+        return self._change_token
+
+    def start(self) -> None:
+        """Start watching the file."""
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self._poll, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop watching."""
+        self._stop_event.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    def _poll(self) -> None:
+        while not self._stop_event.wait(self._poll_interval):
+            try:
+                if not os.path.exists(self._file_path):
+                    continue
+                mtime = os.path.getmtime(self._file_path)
+                if self._last_mtime is not None and mtime != self._last_mtime:
+                    self._last_mtime = mtime
+                    # Replace the change token with a fresh one after signalling
+                    old_token = self._change_token
+                    self._change_token = ConfigurationChangeToken()
+                    old_token.signal()
+                elif self._last_mtime is None:
+                    self._last_mtime = mtime
+            except OSError:
+                pass
+
+
+###########################################
 # Logging System
 ###########################################
 
@@ -513,6 +834,28 @@ class ILogger(ABC):
         """Log a critical message."""
         pass
 
+    @abstractmethod
+    def begin_scope(self, **properties) -> 'LogScope':
+        """Begin a logging scope that adds properties to all log entries within."""
+        pass
+
+
+class LogScope:
+    """Context manager that enriches log entries with additional properties."""
+
+    def __init__(self, logger_instance: 'LoguruLogger', properties: Dict[str, Any]):
+        self._logger = logger_instance
+        self._properties = properties
+        self._previous_logger = None
+
+    def __enter__(self) -> 'LoguruLogger':
+        self._previous_logger = self._logger.bound_logger
+        self._logger.bound_logger = self._logger.bound_logger.bind(**self._properties)
+        return self._logger
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._logger.bound_logger = self._previous_logger
+
 
 class LoguruLogger(ILogger):
     """Implementation of ILogger using loguru."""
@@ -546,6 +889,10 @@ class LoguruLogger(ILogger):
 
     def critical(self, message: str, *args, **kwargs) -> None:
         self.bound_logger.critical(message, *args, **kwargs)
+
+    def begin_scope(self, **properties) -> LogScope:
+        """Begin a logging scope that adds properties to all log entries within."""
+        return LogScope(self, properties)
 
     def with_context(self, context: str) -> 'LoguruLogger':
         """Create a new logger with the specified context."""
@@ -926,6 +1273,189 @@ class WorkerManager:
 
 
 ###########################################
+# Host Environment & Lifetime
+###########################################
+
+
+class IHostEnvironment(ABC):
+    """Provides information about the hosting environment."""
+
+    @property
+    @abstractmethod
+    def environment_name(self) -> str:
+        """Get the name of the environment (e.g. Development, Staging, Production)."""
+
+    @property
+    @abstractmethod
+    def application_name(self) -> str:
+        """Get the name of the application."""
+
+    @property
+    @abstractmethod
+    def content_root_path(self) -> str:
+        """Get the path to the content root directory."""
+
+    def is_development(self) -> bool:
+        """Check if the current environment is Development."""
+        return self.environment_name.lower() == "development"
+
+    def is_staging(self) -> bool:
+        """Check if the current environment is Staging."""
+        return self.environment_name.lower() == "staging"
+
+    def is_production(self) -> bool:
+        """Check if the current environment is Production."""
+        return self.environment_name.lower() == "production"
+
+
+class HostEnvironment(IHostEnvironment):
+    """Default implementation of IHostEnvironment."""
+
+    def __init__(self, environment_name: str = "Production",
+                 application_name: str = "Application",
+                 content_root_path: Optional[str] = None):
+        self._environment_name = environment_name
+        self._application_name = application_name
+        self._content_root_path = content_root_path or os.getcwd()
+
+    @property
+    def environment_name(self) -> str:
+        return self._environment_name
+
+    @property
+    def application_name(self) -> str:
+        return self._application_name
+
+    @property
+    def content_root_path(self) -> str:
+        return self._content_root_path
+
+
+class IHostApplicationLifetime(ABC):
+    """Allows consumers to be notified of application lifetime events."""
+
+    @property
+    @abstractmethod
+    def application_started(self) -> 'CancellationToken':
+        """Triggered when the application host has fully started."""
+
+    @property
+    @abstractmethod
+    def application_stopping(self) -> 'CancellationToken':
+        """Triggered when the application host is performing a graceful shutdown."""
+
+    @property
+    @abstractmethod
+    def application_stopped(self) -> 'CancellationToken':
+        """Triggered when the application host has completed a graceful shutdown."""
+
+    @abstractmethod
+    def stop_application(self) -> None:
+        """Request termination of the current application."""
+
+
+class HostApplicationLifetime(IHostApplicationLifetime):
+    """Default implementation of IHostApplicationLifetime using CancellationTokenSource."""
+
+    def __init__(self):
+        self._started_source = CancellationTokenSource()
+        self._stopping_source = CancellationTokenSource()
+        self._stopped_source = CancellationTokenSource()
+
+    @property
+    def application_started(self) -> 'CancellationToken':
+        return self._started_source.token
+
+    @property
+    def application_stopping(self) -> 'CancellationToken':
+        return self._stopping_source.token
+
+    @property
+    def application_stopped(self) -> 'CancellationToken':
+        return self._stopped_source.token
+
+    def stop_application(self) -> None:
+        """Request termination of the current application."""
+        self.notify_stopping()
+
+    def notify_started(self) -> None:
+        """Signal that the application has started."""
+        self._started_source.cancel()
+
+    def notify_stopping(self) -> None:
+        """Signal that the application is stopping."""
+        self._stopping_source.cancel()
+
+    def notify_stopped(self) -> None:
+        """Signal that the application has stopped."""
+        self._stopped_source.cancel()
+
+
+###########################################
+# Disposable Protocol
+###########################################
+
+
+class IDisposable(ABC):
+    """Interface for objects that hold resources needing cleanup."""
+
+    @abstractmethod
+    def dispose(self) -> None:
+        """Release resources held by this object."""
+
+
+###########################################
+# Middleware Pipeline
+###########################################
+
+
+class IMiddleware(ABC):
+    """A middleware component in a processing pipeline."""
+
+    @abstractmethod
+    def invoke(self, context: Dict[str, Any], next_middleware: Callable[[Dict[str, Any]], None]) -> None:
+        """Process the context and optionally call the next middleware."""
+
+
+class MiddlewarePipeline:
+    """Composable middleware pipeline for processing contexts."""
+
+    def __init__(self):
+        self._middlewares: List[IMiddleware] = []
+
+    def use(self, middleware: IMiddleware) -> 'MiddlewarePipeline':
+        """Add a middleware to the pipeline."""
+        self._middlewares.append(middleware)
+        return self
+
+    def use_func(self, func: Callable[[Dict[str, Any], Callable], None]) -> 'MiddlewarePipeline':
+        """Add a function-based middleware to the pipeline."""
+
+        class _FuncMiddleware(IMiddleware):
+            def invoke(self, context: Dict[str, Any], next_middleware: Callable[[Dict[str, Any]], None]) -> None:
+                func(context, next_middleware)
+
+        self._middlewares.append(_FuncMiddleware())
+        return self
+
+    def execute(self, context: Dict[str, Any]) -> None:
+        """Execute the pipeline with the given context."""
+        if not self._middlewares:
+            return
+
+        def build_chain(index: int) -> Callable[[Dict[str, Any]], None]:
+            if index >= len(self._middlewares):
+                return lambda ctx: None
+
+            middleware = self._middlewares[index]
+            next_call = build_chain(index + 1)
+            return lambda ctx: middleware.invoke(ctx, next_call)
+
+        chain = build_chain(0)
+        chain(context)
+
+
+###########################################
 # Dependency Injection System
 ###########################################
 
@@ -943,13 +1473,15 @@ class ServiceDescriptor:
         implementation_type: Optional[Type] = None,
         implementation_factory: Optional[Callable[['ServiceProvider'], Any]] = None,
         lifetime: ServiceLifetime = ServiceLifetime.SINGLETON,
-        instance: Any = None
+        instance: Any = None,
+        key: Optional[str] = None,
     ):
         self.service_type = service_type
         self.implementation_type = implementation_type or service_type
         self.implementation_factory = implementation_factory
         self.lifetime = lifetime
         self.instance = instance
+        self.key = key
 
 class ApplicationBuilder:
     """Container for service registrations, similar to C#'s host builder pattern."""
@@ -959,9 +1491,17 @@ class ApplicationBuilder:
         self._hosted_service_manager = None
         self._configuration_builder = ConfigurationBuilder()
         self._service_provider = None
+        self._decorators: List[Tuple[Type, Callable]] = []
+        self._validate_on_build = False
+        self._validate_scopes = False
+        self._options_registrations: List[Tuple[Type, str, Type]] = []
 
         # Add environment variables by default
         self._configuration_builder.add_environment_variables()
+
+    # ------------------------------------------------------------------
+    # Core registration
+    # ------------------------------------------------------------------
 
     def add(self, descriptor: ServiceDescriptor) -> 'ApplicationBuilder':
         """Add a service descriptor to the collection."""
@@ -1024,16 +1564,127 @@ class ApplicationBuilder:
             lifetime=ServiceLifetime.TRANSIENT
         ))
 
+    # ------------------------------------------------------------------
+    # TryAdd / Replace / RemoveAll
+    # ------------------------------------------------------------------
+
+    def try_add_singleton(self, service_type: Type[T], implementation_type: Optional[Type] = None) -> 'ApplicationBuilder':
+        """Register a singleton only if this service type is not already registered."""
+        if not any(d.service_type == service_type for d in self._descriptors):
+            self.add_singleton(service_type, implementation_type)
+        return self
+
+    def try_add_scoped(self, service_type: Type[T], implementation_type: Optional[Type] = None) -> 'ApplicationBuilder':
+        """Register a scoped service only if this service type is not already registered."""
+        if not any(d.service_type == service_type for d in self._descriptors):
+            self.add_scoped(service_type, implementation_type)
+        return self
+
+    def try_add_transient(self, service_type: Type[T], implementation_type: Optional[Type] = None) -> 'ApplicationBuilder':
+        """Register a transient service only if this service type is not already registered."""
+        if not any(d.service_type == service_type for d in self._descriptors):
+            self.add_transient(service_type, implementation_type)
+        return self
+
+    def replace(self, descriptor: ServiceDescriptor) -> 'ApplicationBuilder':
+        """Replace the first registration for the same service type."""
+        for i, d in enumerate(self._descriptors):
+            if d.service_type == descriptor.service_type:
+                self._descriptors[i] = descriptor
+                return self
+        self._descriptors.append(descriptor)
+        return self
+
+    def remove_all(self, service_type: Type) -> 'ApplicationBuilder':
+        """Remove all registrations for the specified service type."""
+        self._descriptors = [d for d in self._descriptors if d.service_type != service_type]
+        return self
+
+    # ------------------------------------------------------------------
+    # Keyed / Named services
+    # ------------------------------------------------------------------
+
+    def add_keyed_singleton(self, service_type: Type[T], key: str,
+                            implementation_type: Optional[Type] = None) -> 'ApplicationBuilder':
+        """Register a keyed singleton service."""
+        return self.add(ServiceDescriptor(
+            service_type=service_type,
+            implementation_type=implementation_type,
+            lifetime=ServiceLifetime.SINGLETON,
+            key=key,
+        ))
+
+    def add_keyed_singleton_factory(self, service_type: Type[T], key: str,
+                                     factory: Callable[['ServiceProvider'], T]) -> 'ApplicationBuilder':
+        """Register a keyed singleton service with a factory function."""
+        return self.add(ServiceDescriptor(
+            service_type=service_type,
+            implementation_factory=factory,
+            lifetime=ServiceLifetime.SINGLETON,
+            key=key,
+        ))
+
+    def add_keyed_scoped(self, service_type: Type[T], key: str,
+                         implementation_type: Optional[Type] = None) -> 'ApplicationBuilder':
+        """Register a keyed scoped service."""
+        return self.add(ServiceDescriptor(
+            service_type=service_type,
+            implementation_type=implementation_type,
+            lifetime=ServiceLifetime.SCOPED,
+            key=key,
+        ))
+
+    def add_keyed_transient(self, service_type: Type[T], key: str,
+                            implementation_type: Optional[Type] = None) -> 'ApplicationBuilder':
+        """Register a keyed transient service."""
+        return self.add(ServiceDescriptor(
+            service_type=service_type,
+            implementation_type=implementation_type,
+            lifetime=ServiceLifetime.TRANSIENT,
+            key=key,
+        ))
+
+    # ------------------------------------------------------------------
+    # Service Decoration
+    # ------------------------------------------------------------------
+
+    def decorate(self, service_type: Type[T],
+                 decorator_factory: Callable[['ServiceProvider', T], T]) -> 'ApplicationBuilder':
+        """Wrap an existing service registration with a decorator.
+
+        The decorator_factory receives (provider, inner_instance) and returns
+        the decorated instance.
+        """
+        self._decorators.append((service_type, decorator_factory))
+        return self
+
+    # ------------------------------------------------------------------
+    # Options / Typed Configuration
+    # ------------------------------------------------------------------
+
+    def configure_options(self, options_type: Type[T], section_key: str) -> 'ApplicationBuilder':
+        """Register typed options bound to a configuration section.
+
+        Registers IOptions (singleton), IOptionsSnapshot (scoped),
+        and IOptionsMonitor (singleton) for the specified type.
+        """
+        self._options_registrations.append((options_type, section_key, options_type))
+        return self
+
+    # ------------------------------------------------------------------
+    # Workers
+    # ------------------------------------------------------------------
+
     def add_worker(self, implementation_type: Type[IWorker]) -> 'ApplicationBuilder':
         """Register a hosted service that will start when the service provider is built."""
-        # Register as singleton to ensure there's only one instance
         self.add_singleton(implementation_type)
-
-        # Register as IWorker for discovery
         if implementation_type != IWorker:
             self.add_singleton(IWorker, implementation_type)
-
         return self
+
+    # ------------------------------------------------------------------
+    # Configuration
+    # ------------------------------------------------------------------
 
     def add_configuration(self, configure_action: Callable[[ConfigurationBuilder], None]) -> 'ApplicationBuilder':
         """Configure the configuration system."""
@@ -1042,38 +1693,49 @@ class ApplicationBuilder:
 
     def add_configuration_dictionary(self, config_dict: Dict[str, Any]) -> 'ApplicationBuilder':
         """Add configuration from a dictionary."""
-        # Flatten the dictionary if it contains nested dictionaries
-        flat_dict = {}
+        flat_dict: Dict[str, str] = {}
 
-        def flatten_dict(d, prefix=''):
+        def flatten_dict(d: Dict, prefix: str = '') -> None:
             for key, value in d.items():
                 new_key = f"{prefix}:{key}" if prefix else key
-
                 if isinstance(value, dict):
                     flatten_dict(value, new_key)
                 else:
                     flat_dict[new_key] = str(value)
 
         flatten_dict(config_dict)
-
-        # Add the flattened dictionary to the configuration
         self._configuration_builder.add_in_memory_collection(flat_dict)
         return self
 
+    # ------------------------------------------------------------------
+    # Validation flags
+    # ------------------------------------------------------------------
+
+    def set_validate_on_build(self, enabled: bool = True) -> 'ApplicationBuilder':
+        """Enable or disable build-time validation of service registrations."""
+        self._validate_on_build = enabled
+        return self
+
+    def set_validate_scopes(self, enabled: bool = True) -> 'ApplicationBuilder':
+        """Enable or disable scope validation (prevent scoped from root)."""
+        self._validate_scopes = enabled
+        return self
+
+    # ------------------------------------------------------------------
+    # Build
+    # ------------------------------------------------------------------
+
     def build(self, auto_start_hosted_services: bool = True) -> 'ServiceProvider':
         """Build a service provider from this application builder."""
-        # Build the configuration
         configuration = self._configuration_builder.build()
 
-        # Register the configuration
         self.add_singleton_instance(IConfiguration, configuration)
         self.add_singleton_instance(Configuration, configuration)
 
-        # Register the logger as a transient service that creates a new instance each time
         if not any(d.service_type == ILogger for d in self._descriptors):
             self.add_transient_factory(ILogger, lambda provider: LoguruLogger(
                 provider.get_required_service(IConfiguration),
-                "Default"  # Default context, will be overridden in _create_instance
+                "Default"
             ))
 
         if not any(d.service_type == JobManager for d in self._descriptors):
@@ -1082,58 +1744,118 @@ class ApplicationBuilder:
         if not any(d.service_type == CliRunnerService for d in self._descriptors):
             self.add_singleton(CliRunnerService)
 
+        # Register IHostEnvironment
+        if not any(d.service_type == IHostEnvironment for d in self._descriptors):
+            env_name = configuration.get("Environment", os.environ.get("APP_ENVIRONMENT", "Production"))
+            app_name = configuration.get("ApplicationName", "Application")
+            content_root = configuration.get("ContentRoot", os.getcwd())
+            host_env = HostEnvironment(env_name, app_name, content_root)
+            self.add_singleton_instance(IHostEnvironment, host_env)
+
+        # Register IHostApplicationLifetime
+        if not any(d.service_type == IHostApplicationLifetime for d in self._descriptors):
+            lifetime = HostApplicationLifetime()
+            self.add_singleton_instance(IHostApplicationLifetime, lifetime)
+            self.add_singleton_instance(HostApplicationLifetime, lifetime)
+
+        # Register options
+        for options_type, section_key, _ in self._options_registrations:
+            self.add_singleton_factory(
+                IOptions,
+                lambda sp, sk=section_key, ot=options_type: _OptionsImpl(
+                    sp.get_required_service(IConfiguration), sk, ot
+                ),
+            )
+            self.add_scoped_factory(
+                IOptionsSnapshot,
+                lambda sp, sk=section_key, ot=options_type: _OptionsSnapshotImpl(
+                    sp.get_required_service(IConfiguration), sk, ot
+                ),
+            )
+            self.add_singleton_factory(
+                IOptionsMonitor,
+                lambda sp, sk=section_key, ot=options_type: _OptionsMonitorImpl(
+                    sp.get_required_service(IConfiguration), sk, ot
+                ),
+            )
+
+        # Register MiddlewarePipeline if not present
+        if not any(d.service_type == MiddlewarePipeline for d in self._descriptors):
+            self.add_singleton_instance(MiddlewarePipeline, MiddlewarePipeline())
+
         # Create the service provider
-        provider = ServiceProvider(self._descriptors)
+        provider = ServiceProvider(self._descriptors, validate_scopes=self._validate_scopes,
+                                   decorators=self._decorators)
 
         # Register the scope factory
         scope_factory = ScopeFactory(provider)
         self.add_singleton_instance(ScopeFactory, scope_factory)
 
-        # Discover and register hosted services
+        # Validate on build
+        if self._validate_on_build:
+            provider.validate_all_registrations()
+
         if auto_start_hosted_services:
             provider.start_hosted_services()
 
         return provider
 
+    # ------------------------------------------------------------------
+    # Run
+    # ------------------------------------------------------------------
+
     def run(self) -> None:
         """Build the service provider and run the application until terminated."""
-        # Build the service provider if not already built
         if not self._service_provider:
             self._service_provider = self.build(auto_start_hosted_services=True)
 
-        # Get the logger
         log = self._service_provider.get_required_service(ILogger)
+
+        # Notify started
+        lifetime = self._service_provider.get_service(HostApplicationLifetime)
+        if lifetime:
+            lifetime.notify_started()
 
         log.info("Application started. Press Ctrl+C to exit.")
 
-        # Set up signal handlers for graceful shutdown
         def handle_exit(sig, frame):
             log.info("Application shutting down...")
+            if lifetime:
+                lifetime.notify_stopping()
             if self._service_provider:
                 self._service_provider.stop_hosted_services()
+            if lifetime:
+                lifetime.notify_stopped()
             sys.exit(0)
 
         signal.signal(signal.SIGINT, handle_exit)
         signal.signal(signal.SIGTERM, handle_exit)
 
-        # Keep the application running
         try:
-            # Block the main thread until interrupted
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
             log.info("Application shutting down...")
+            if lifetime:
+                lifetime.notify_stopping()
             if self._service_provider:
                 self._service_provider.stop_hosted_services()
+            if lifetime:
+                lifetime.notify_stopped()
 
 class ServiceProvider:
     """Resolves services from the service collection, similar to C#'s IServiceProvider."""
 
-    def __init__(self, descriptors: List[ServiceDescriptor]):
+    def __init__(self, descriptors: List[ServiceDescriptor],
+                 validate_scopes: bool = False,
+                 decorators: Optional[List[Tuple[Type, Callable]]] = None):
         self._descriptors = descriptors
         self._singleton_instances: Dict[Type, Any] = {}
         self._scoped_instances: Dict[Type, Any] = {}
-        self._hosted_service_manager = None  # Initialize to None
+        self._hosted_service_manager = None
+        self._validate_scopes = validate_scopes
+        self._decorators = decorators or []
+        self._is_scope = False
 
         # Register self as ServiceProvider
         self._singleton_instances[ServiceProvider] = self
@@ -1141,7 +1863,12 @@ class ServiceProvider:
     def get_service(self, service_type: Type[T]) -> Optional[T]:
         """Get a service of the specified type or None if not found."""
         for descriptor in reversed(self._descriptors):
-            if descriptor.service_type == service_type:
+            if descriptor.service_type == service_type and descriptor.key is None:
+                if self._validate_scopes and not self._is_scope and descriptor.lifetime == ServiceLifetime.SCOPED:
+                    raise RuntimeError(
+                        f"Cannot resolve scoped service {service_type.__name__} from root provider. "
+                        f"Create a scope first using ScopeFactory.create_scope_context()."
+                    )
                 return self._resolve_service(descriptor)
         return None
 
@@ -1152,11 +1879,25 @@ class ServiceProvider:
             raise KeyError(f"Service {service_type.__name__} is not registered")
         return service
 
+    def get_keyed_service(self, service_type: Type[T], key: str) -> Optional[T]:
+        """Get a keyed service of the specified type and key."""
+        for descriptor in reversed(self._descriptors):
+            if descriptor.service_type == service_type and descriptor.key == key:
+                return self._resolve_service(descriptor)
+        return None
+
+    def get_required_keyed_service(self, service_type: Type[T], key: str) -> T:
+        """Get a keyed service or raise an exception if not found."""
+        service = self.get_keyed_service(service_type, key)
+        if service is None:
+            raise KeyError(f"Service {service_type.__name__} with key '{key}' is not registered")
+        return service
+
     def get_services(self, service_type: Type[T]) -> List[T]:
         """Get all services of the specified type."""
         services = []
         for descriptor in self._descriptors:
-            if descriptor.service_type == service_type:
+            if descriptor.service_type == service_type and descriptor.key is None:
                 service = self._resolve_service(descriptor)
                 if service is not None:
                     services.append(service)
@@ -1168,17 +1909,31 @@ class ServiceProvider:
             return descriptor.instance
 
         if descriptor.lifetime == ServiceLifetime.SINGLETON:
-            if descriptor.implementation_type not in self._singleton_instances:
-                self._singleton_instances[descriptor.implementation_type] = self._create_instance(descriptor)
-            return self._singleton_instances[descriptor.implementation_type]
+            cache_key = (descriptor.implementation_type, descriptor.key)
+            if cache_key not in self._singleton_instances:
+                instance = self._create_instance(descriptor)
+                instance = self._apply_decorators(descriptor.service_type, instance)
+                self._singleton_instances[cache_key] = instance
+            return self._singleton_instances[cache_key]
 
         elif descriptor.lifetime == ServiceLifetime.SCOPED:
-            if descriptor.implementation_type not in self._scoped_instances:
-                self._scoped_instances[descriptor.implementation_type] = self._create_instance(descriptor)
-            return self._scoped_instances[descriptor.implementation_type]
+            cache_key = (descriptor.implementation_type, descriptor.key)
+            if cache_key not in self._scoped_instances:
+                instance = self._create_instance(descriptor)
+                instance = self._apply_decorators(descriptor.service_type, instance)
+                self._scoped_instances[cache_key] = instance
+            return self._scoped_instances[cache_key]
 
         else:  # TRANSIENT
-            return self._create_instance(descriptor)
+            instance = self._create_instance(descriptor)
+            return self._apply_decorators(descriptor.service_type, instance)
+
+    def _apply_decorators(self, service_type: Type, instance: Any) -> Any:
+        """Apply any registered decorators for this service type."""
+        for dec_type, dec_factory in self._decorators:
+            if dec_type == service_type:
+                instance = dec_factory(self, instance)
+        return instance
 
     def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
         """Create an instance of the service."""
@@ -1208,21 +1963,17 @@ class ServiceProvider:
                 # Check if parameter is List[T]
                 origin = get_origin(param_type)
                 if origin is list or origin is List:
-                    # Extract the generic type T from List[T]
                     args = get_args(param_type)
                     if args:
                         service_type = args[0]
-                        # Get all services of this type
                         dependency = self.get_services(service_type)
                     else:
                         dependency = []
                 else:
-                    # Regular single service resolution
                     dependency = self.get_service(param_type)
 
                     # Set context for logger if it's being injected
                     if dependency is not None and param_type == ILogger and isinstance(dependency, LoguruLogger):
-                        # Use the class name as context
                         class_name = implementation_type.__name__
                         dependency = dependency.with_context(class_name)
 
@@ -1232,8 +1983,45 @@ class ServiceProvider:
                 if dependency is not None:
                     dependencies[param_name] = dependency
 
-        # Create the instance with resolved dependencies
         return implementation_type(**dependencies)
+
+    def validate_all_registrations(self) -> None:
+        """Walk every registration and verify all constructor params can be resolved.
+
+        Raises ValueError listing all unresolvable services.
+        """
+        errors: List[str] = []
+        known_types: Set[Type] = {d.service_type for d in self._descriptors}
+        # Include infrastructure types that are always available
+        known_types.update({ServiceProvider, ScopeFactory, IConfiguration, Configuration,
+                            ILogger, JobManager, CliRunnerService, IHostEnvironment,
+                            IHostApplicationLifetime, MiddlewarePipeline})
+
+        for descriptor in self._descriptors:
+            if descriptor.implementation_factory or descriptor.instance is not None:
+                continue
+            impl = descriptor.implementation_type
+            try:
+                hints = get_type_hints(impl.__init__)
+            except Exception:
+                continue
+            hints.pop('return', None)
+            sig = inspect.signature(impl.__init__)
+            for pname, pparam in sig.parameters.items():
+                if pname == 'self':
+                    continue
+                if pname not in hints:
+                    continue
+                ptype = hints[pname]
+                origin = get_origin(ptype)
+                if origin is list or origin is List:
+                    continue
+                if ptype not in known_types and pparam.default is pparam.empty:
+                    errors.append(f"  {impl.__name__}: parameter '{pname}' of type {ptype.__name__} cannot be resolved")
+
+        if errors:
+            msg = "ValidateOnBuild failed. Unresolvable dependencies:\n" + "\n".join(errors)
+            raise ValueError(msg)
 
     def create_scope(self) -> 'ServiceProvider':
         """Create a new scope with the same service registrations."""
@@ -1241,7 +2029,6 @@ class ServiceProvider:
 
     def start_hosted_services(self) -> None:
         """Discover and start all hosted services."""
-        # Initialize worker manager if not already done
         if self._hosted_service_manager is None:
             self._hosted_service_manager = WorkerManager(self)
 
@@ -1262,14 +2049,30 @@ class ServiceProvider:
             self._hosted_service_manager.stop_all()
 
 class ServiceScope(ServiceProvider):
-    """Represents a scope for scoped services."""
+    """Represents a scope for scoped services. Supports disposal."""
 
     def __init__(self, root_provider: ServiceProvider):
-        # Share descriptors and singleton instances with parent provider
         self._descriptors = root_provider._descriptors
         self._singleton_instances = root_provider._singleton_instances
-        # New empty dict for scoped instances in this scope
         self._scoped_instances: Dict[Type, Any] = {}
+        self._hosted_service_manager = None
+        self._validate_scopes = root_provider._validate_scopes
+        self._decorators = root_provider._decorators
+        self._is_scope = True
+        self._disposed = False
+
+    def dispose(self) -> None:
+        """Dispose all scoped instances that implement IDisposable."""
+        if self._disposed:
+            return
+        self._disposed = True
+        for instance in self._scoped_instances.values():
+            if isinstance(instance, IDisposable):
+                try:
+                    instance.dispose()
+                except Exception:
+                    pass
+        self._scoped_instances.clear()
 
 class ScopeFactory:
     """Factory for creating and managing service scopes."""
@@ -1278,20 +2081,20 @@ class ScopeFactory:
         self.provider = provider
 
     class ScopeContext:
-        """Context manager for service scopes."""
+        """Context manager for service scopes with disposal."""
         def __init__(self, factory: 'ScopeFactory'):
             self.factory = factory
-            self.scope = None
+            self.scope: Optional[ServiceScope] = None
 
         def __enter__(self) -> ServiceProvider:
             self.scope = self.factory.provider.create_scope()
             return self.scope
 
         def __exit__(self, exc_type, exc_val, exc_tb):
-            # Clean up any resources if needed
-            pass
+            if self.scope and isinstance(self.scope, ServiceScope):
+                self.scope.dispose()
 
-    def create_scope_context(self) -> ServiceProvider:
+    def create_scope_context(self) -> 'ScopeContext':
         """Create a scope that can be used as a context manager."""
         return self.ScopeContext(self)
 
