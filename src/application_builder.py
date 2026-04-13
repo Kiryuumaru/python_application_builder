@@ -1865,7 +1865,7 @@ class ApplicationBuilder:
     def run(self) -> None:
         """Build the service provider and run the application until terminated."""
         if not self._service_provider:
-            self._service_provider = self.build(auto_start_hosted_services=True)
+            self._service_provider = self.build(auto_start_hosted_services=False)
 
         log = self._service_provider.get_required_service(ILogger)
 
@@ -1875,6 +1875,9 @@ class ApplicationBuilder:
             lifetime.notify_started()
 
         log.info("Application started. Press Ctrl+C to exit.")
+
+        # Start hosted services after startup notification
+        self._service_provider.start_hosted_services()
 
         def handle_exit(sig, frame):
             log.info("Application shutting down...")
