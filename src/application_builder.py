@@ -63,17 +63,13 @@ def _ensure_loguru_initialized():
 
 
 def reset_logger_state():
-    """Reset loguru logger state by removing all custom sinks.
+    """Reset loguru logger state by removing all sinks and re-initializing.
 
     Intended for use in tests to ensure clean state between test cases.
+    Removes all loguru sinks (including any added outside this module).
     """
     global _loguru_initialized
     with _loguru_logger_lock:
-        for sink_id in _loguru_sink_ids:
-            try:
-                loguru.logger.remove(sink_id)
-            except ValueError:
-                pass
         _loguru_sink_ids.clear()
         loguru.logger.remove()
         _loguru_initialized = False

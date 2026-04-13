@@ -8,7 +8,6 @@ from application_builder import (
     create_loguru_logger,
     normalize_log_level,
     reset_logger_state,
-    _ensure_loguru_initialized,
 )
 
 
@@ -20,7 +19,9 @@ def _reset_loguru_state():
 def _capture_logger_output(log_context: str, log_level: str) -> tuple:
     """Create a logger writing to a StringIO and return (logger, buffer)."""
     _reset_loguru_state()
-    _ensure_loguru_initialized()
+
+    # create_loguru_logger triggers initialization internally
+    create_loguru_logger(log_context, log_level, None)
 
     buf = io.StringIO()
     resolved = normalize_log_level(log_level)
@@ -131,7 +132,9 @@ class TestLoggerLevelIsolation:
 
     def test_two_loggers_different_levels(self):
         _reset_loguru_state()
-        _ensure_loguru_initialized()
+
+        # Trigger loguru initialization via a throwaway logger
+        create_loguru_logger("_init", "TRACE", None)
 
         buf_a = io.StringIO()
         buf_b = io.StringIO()
