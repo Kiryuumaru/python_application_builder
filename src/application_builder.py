@@ -17,24 +17,72 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Type, Typ
 T = TypeVar('T')
 
 _loguru_logger_lock = threading.Lock()
+_loguru_initialized = False
+_loguru_sink_ids: List[int] = []
+
+_LOG_LEVEL_ALIASES: Dict[str, str] = {
+    "WARN": "WARNING",
+    "FATAL": "CRITICAL",
+    "VERBOSE": "TRACE",
+    "INFORMATION": "INFO",
+}
+
+_VALID_LOG_LEVELS = {"TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"}
 
 
-def create_loguru_logger(log_context, log_level, log_file):
+def normalize_log_level(level: str) -> str:
+    """Normalize a log level string to a valid loguru level name.
+
+    Handles case-insensitive matching and common aliases (WARN, FATAL, etc.).
+    """
+    upper = level.upper()
+    resolved = _LOG_LEVEL_ALIASES.get(upper, upper)
+    if resolved not in _VALID_LOG_LEVELS:
+        raise ValueError(
+            f"Invalid log level '{level}'. "
+            f"Valid levels: {', '.join(sorted(_VALID_LOG_LEVELS))}. "
+            f"Aliases: {', '.join(f'{k}->{v}' for k, v in sorted(_LOG_LEVEL_ALIASES.items()))}"
+        )
+    return resolved
+
+
+def _ensure_loguru_initialized():
+    """Initialize loguru global configuration once: set custom colors and remove default sinks."""
+    global _loguru_initialized
+    if _loguru_initialized:
+        return
+    loguru.logger.level("TRACE", color="<fg #444444>")
+    loguru.logger.level("DEBUG", color="<fg #666666>")
+    loguru.logger.level("INFO", color="<fg #FFFFFF>")
+    loguru.logger.level("SUCCESS", color="<fg #00CC99>")
+    loguru.logger.level("WARNING", color="<fg #FFBB00>")
+    loguru.logger.level("ERROR", color="<fg #FF4444>")
+    loguru.logger.level("CRITICAL", color="<fg #FF00FF>")
+    loguru.logger.remove()
+    _loguru_initialized = True
+
+
+def create_loguru_logger(log_context: str, log_level: str, log_file: Optional[str]):
     log_format = '<fg 95,95,95>{time}</> <level>{level: <8}</> - [<fg 95,95,95>{extra[context]}</>] <level>{message}</>'
+    resolved_level = normalize_log_level(log_level)
+    level_no = loguru.logger.level(resolved_level).no
+
+    def context_filter(record):
+        return record["extra"].get("context") == log_context and record["level"].no >= level_no
+
     with _loguru_logger_lock:
-        created_logger = loguru.logger.bind(context=log_context)
-        created_logger.level("TRACE", color="<fg #444444>")
-        created_logger.level("DEBUG", color="<fg #666666>")
-        created_logger.level("INFO", color="<fg #FFFFFF>")
-        created_logger.level("SUCCESS", color="<fg #00CC99>")
-        created_logger.level("WARNING", color="<fg #FFBB00>")
-        created_logger.level("ERROR", color="<fg #FF4444>")
-        created_logger.level("CRITICAL", color="<fg #FF00FF>")
-        created_logger.remove()
-        created_logger.add(sys.stdout, colorize=True, format=log_format, level=log_level)
+        _ensure_loguru_initialized()
+        sink_id = loguru.logger.add(
+            sys.stdout, colorize=True, format=log_format, level="TRACE", filter=context_filter
+        )
+        _loguru_sink_ids.append(sink_id)
         if log_file:
-            created_logger.add(log_file, rotation="10 MB", level=log_level, format=log_format)
-    return created_logger
+            file_sink_id = loguru.logger.add(
+                log_file, rotation="10 MB", level="TRACE", format=log_format, filter=context_filter
+            )
+            _loguru_sink_ids.append(file_sink_id)
+
+    return loguru.logger.bind(context=log_context)
 
 
 logger = create_loguru_logger("Default", "TRACE", None)
