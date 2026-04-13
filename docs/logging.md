@@ -6,7 +6,6 @@ The framework provides structured logging through `ILogger`, backed by [loguru](
 
 - [ILogger Interface](#ilogger-interface)
 - [Log Levels](#log-levels)
-  - [Level Aliases](#level-aliases)
 - [Automatic Context](#automatic-context)
 - [Log Scopes](#log-scopes)
 - [Configuration](#configuration)
@@ -56,19 +55,6 @@ Levels from lowest to highest severity:
 | CRITICAL | Magenta | System-level failure |
 
 The minimum log level is controlled by the `Logging:Level` configuration key. Only messages at or above the configured level are emitted.
-
-### Level Aliases
-
-Common alternate names from other logging frameworks are accepted wherever a log level string is expected (configuration values, `create_loguru_logger`, etc.). Matching is case-insensitive.
-
-| Alias | Resolves To |
-|-------|-------------|
-| `WARN` | WARNING |
-| `FATAL` | CRITICAL |
-| `VERBOSE` | TRACE |
-| `INFORMATION` | INFO |
-
-For example, setting `Logging:Level` to `WARN` is equivalent to `WARNING`. An invalid level string raises `ValueError` with a message listing valid levels and aliases.
 
 ## Automatic Context
 
@@ -129,7 +115,7 @@ app.add_configuration_dictionary({
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `Logging:Level` | string | `TRACE` | Minimum log level (accepts aliases — see [Level Aliases](#level-aliases)) |
+| `Logging:Level` | string | `TRACE` | Minimum log level |
 | `Logging:File` | string | `None` | File path for log output (optional) |
 
 When `Logging:File` is set, logs are written to both stdout and the file. File rotation is automatic at 10 MB.
