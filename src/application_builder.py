@@ -19,6 +19,7 @@ T = TypeVar('T')
 _loguru_logger_lock = threading.Lock()
 _loguru_initialized = False
 _loguru_sink_ids: List[int] = []
+_loguru_context_sinks: Dict[str, List[int]] = {}
 
 _VALID_LOG_LEVELS = {"TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"}
 
@@ -62,6 +63,7 @@ def reset_logger_state():
     global _loguru_initialized
     with _loguru_logger_lock:
         _loguru_sink_ids.clear()
+        _loguru_context_sinks.clear()
         loguru.logger.remove()
         _loguru_initialized = False
 
@@ -76,15 +78,19 @@ def create_loguru_logger(log_context: str, log_level: str, log_file: Optional[st
 
     with _loguru_logger_lock:
         _ensure_loguru_initialized()
-        sink_id = loguru.logger.add(
-            sys.stdout, colorize=True, format=log_format, level="TRACE", filter=context_filter
-        )
-        _loguru_sink_ids.append(sink_id)
-        if log_file:
-            file_sink_id = loguru.logger.add(
-                log_file, rotation="10 MB", level="TRACE", format=log_format, filter=context_filter
+        if log_context not in _loguru_context_sinks:
+            _loguru_context_sinks[log_context] = []
+            sink_id = loguru.logger.add(
+                sys.stdout, colorize=True, format=log_format, level="TRACE", filter=context_filter
             )
-            _loguru_sink_ids.append(file_sink_id)
+            _loguru_sink_ids.append(sink_id)
+            _loguru_context_sinks[log_context].append(sink_id)
+            if log_file:
+                file_sink_id = loguru.logger.add(
+                    log_file, rotation="10 MB", level="TRACE", format=log_format, filter=context_filter
+                )
+                _loguru_sink_ids.append(file_sink_id)
+                _loguru_context_sinks[log_context].append(file_sink_id)
 
     return loguru.logger.bind(context=log_context)
 
