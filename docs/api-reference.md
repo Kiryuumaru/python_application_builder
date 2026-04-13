@@ -603,6 +603,30 @@ class OperationCanceledException(Exception):
 
 ## Utility Functions
 
+### validate_log_level
+
+```python
+def validate_log_level(level: str) -> str
+```
+
+Validate and return a log level string as a valid loguru level name. Handles case-insensitive matching. Raises `ValueError` for unrecognized level strings. Only accepts actual loguru levels: TRACE, DEBUG, INFO, SUCCESS, WARNING, ERROR, CRITICAL.
+
+### create_loguru_logger
+
+```python
+def create_loguru_logger(log_context: str, log_level: str, log_file: Optional[str])
+```
+
+Create a loguru logger bound to a specific context. Adds a stdout sink (with color) and optionally a file sink (10 MB rotation). The `log_level` is validated through `validate_log_level`.
+
+### reset_logger_state
+
+```python
+def reset_logger_state() -> None
+```
+
+Reset loguru logger state by removing all sinks and re-initializing. Intended for use in tests to ensure clean state between test cases.
+
 ### create_linked_token
 
 ```python
