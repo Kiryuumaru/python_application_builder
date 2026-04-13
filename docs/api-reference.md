@@ -458,6 +458,7 @@ class Worker(IWorker):
 | `stop() -> None` | Signal stop and wait up to 30 seconds |
 | `execute() -> None` | **Abstract** — implement the work logic |
 | `is_stopping() -> bool` | Check if stop has been signaled |
+| `stopping_token` | Property — `CancellationToken` cancelled when worker stops |
 | `wait_for_stop(timeout_seconds=None) -> bool` | Wait for stop signal; returns `True` if signaled |
 
 ---

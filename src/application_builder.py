@@ -1219,6 +1219,7 @@ class Worker(IWorker):
     def __init__(self):
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
+        self._stopping_cts = CancellationTokenSource()
         self._state = WorkerState.CREATED
 
     def start(self) -> None:
@@ -1228,6 +1229,7 @@ class Worker(IWorker):
 
         self._state = WorkerState.STARTING
         self._stop_event.clear()
+        self._stopping_cts = CancellationTokenSource()
         self._thread = threading.Thread(target=self._run_worker, daemon=True)
         self._thread.start()
 
@@ -1237,6 +1239,7 @@ class Worker(IWorker):
             return
 
         self._state = WorkerState.STOPPING
+        self._stopping_cts.cancel()
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=30)  # Wait up to 30 seconds for the thread to finish
@@ -1260,6 +1263,11 @@ class Worker(IWorker):
     def is_stopping(self) -> bool:
         """Checks if the service is stopping."""
         return self._stop_event.is_set()
+
+    @property
+    def stopping_token(self) -> 'CancellationToken':
+        """Returns a CancellationToken that is cancelled when the worker is stopping."""
+        return self._stopping_cts.token
 
     def wait_for_stop(self, timeout_seconds: float = None) -> bool:
         """Waits for the stop signal with an optional timeout."""
