@@ -20,30 +20,21 @@ _loguru_logger_lock = threading.Lock()
 _loguru_initialized = False
 _loguru_sink_ids: List[int] = []
 
-_LOG_LEVEL_ALIASES: Dict[str, str] = {
-    "WARN": "WARNING",
-    "FATAL": "CRITICAL",
-    "VERBOSE": "TRACE",
-    "INFORMATION": "INFO",
-}
-
 _VALID_LOG_LEVELS = {"TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"}
 
 
-def normalize_log_level(level: str) -> str:
-    """Normalize a log level string to a valid loguru level name.
+def validate_log_level(level: str) -> str:
+    """Validate and return a log level string as a valid loguru level name.
 
-    Handles case-insensitive matching and common aliases (WARN, FATAL, etc.).
+    Handles case-insensitive matching. Raises ValueError for unrecognized levels.
     """
     upper = level.upper()
-    resolved = _LOG_LEVEL_ALIASES.get(upper, upper)
-    if resolved not in _VALID_LOG_LEVELS:
+    if upper not in _VALID_LOG_LEVELS:
         raise ValueError(
             f"Invalid log level '{level}'. "
-            f"Valid levels: {', '.join(sorted(_VALID_LOG_LEVELS))}. "
-            f"Aliases: {', '.join(f'{k}->{v}' for k, v in sorted(_LOG_LEVEL_ALIASES.items()))}"
+            f"Valid levels: {', '.join(sorted(_VALID_LOG_LEVELS))}"
         )
-    return resolved
+    return upper
 
 
 def _ensure_loguru_initialized():
@@ -77,7 +68,7 @@ def reset_logger_state():
 
 def create_loguru_logger(log_context: str, log_level: str, log_file: Optional[str]):
     log_format = '<fg 95,95,95>{time}</> <level>{level: <8}</> - [<fg 95,95,95>{extra[context]}</>] <level>{message}</>'
-    resolved_level = normalize_log_level(log_level)
+    resolved_level = validate_log_level(log_level)
     level_no = loguru.logger.level(resolved_level).no
 
     def context_filter(record):

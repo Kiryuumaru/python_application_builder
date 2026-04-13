@@ -6,7 +6,7 @@ from application_builder import (
     ApplicationBuilder,
     LoguruLogger,
     create_loguru_logger,
-    normalize_log_level,
+    validate_log_level,
     reset_logger_state,
 )
 
@@ -24,7 +24,7 @@ def _capture_logger_output(log_context: str, log_level: str) -> tuple:
     create_loguru_logger(log_context, log_level, None)
 
     buf = io.StringIO()
-    resolved = normalize_log_level(log_level)
+    resolved = validate_log_level(log_level)
     level_no = loguru.logger.level(resolved).no
 
     def context_filter(record):
@@ -39,11 +39,11 @@ def _capture_logger_output(log_context: str, log_level: str) -> tuple:
     return bound, buf
 
 
-# ─── normalize_log_level ─────────────────────────────────────────────
+# ─── validate_log_level ──────────────────────────────────────────────
 
 
-class TestNormalizeLogLevel:
-    """Tests for the normalize_log_level function."""
+class TestValidateLogLevel:
+    """Tests for the validate_log_level function."""
 
     @pytest.mark.parametrize("input_level,expected", [
         ("TRACE", "TRACE"),
@@ -55,7 +55,7 @@ class TestNormalizeLogLevel:
         ("CRITICAL", "CRITICAL"),
     ])
     def test_valid_levels_pass_through(self, input_level: str, expected: str):
-        assert normalize_log_level(input_level) == expected
+        assert validate_log_level(input_level) == expected
 
     @pytest.mark.parametrize("input_level,expected", [
         ("trace", "TRACE"),
@@ -68,27 +68,12 @@ class TestNormalizeLogLevel:
         ("critical", "CRITICAL"),
     ])
     def test_case_insensitive(self, input_level: str, expected: str):
-        assert normalize_log_level(input_level) == expected
+        assert validate_log_level(input_level) == expected
 
-    @pytest.mark.parametrize("alias,expected", [
-        ("WARN", "WARNING"),
-        ("warn", "WARNING"),
-        ("Warn", "WARNING"),
-        ("FATAL", "CRITICAL"),
-        ("fatal", "CRITICAL"),
-        ("Fatal", "CRITICAL"),
-        ("VERBOSE", "TRACE"),
-        ("verbose", "TRACE"),
-        ("INFORMATION", "INFO"),
-        ("information", "INFO"),
-    ])
-    def test_aliases(self, alias: str, expected: str):
-        assert normalize_log_level(alias) == expected
-
-    @pytest.mark.parametrize("invalid", ["", "BANANA", "NONE", "OFF", "ALL", "123"])
+    @pytest.mark.parametrize("invalid", ["", "BANANA", "NONE", "OFF", "ALL", "123", "WARN", "FATAL", "VERBOSE", "INFORMATION"])
     def test_invalid_levels_raise(self, invalid: str):
         with pytest.raises(ValueError, match="Invalid log level"):
-            normalize_log_level(invalid)
+            validate_log_level(invalid)
 
 
 # ─── Level filtering ─────────────────────────────────────────────────
@@ -233,7 +218,7 @@ class TestILoggerMethods:
 
         buf = io.StringIO()
         log_format = "{level} - [{extra[context]}] {message}"
-        resolved = normalize_log_level(level)
+        resolved = validate_log_level(level)
         level_no = loguru.logger.level(resolved).no
 
         def filt(record):
@@ -277,72 +262,12 @@ class TestILoggerMethods:
         log.critical("hello critical")
         assert "hello critical" in buf.getvalue()
 
-    def test_warn_alias_configures_warning_level(self):
-        log, buf = self._make_logger("WARN")
-        log.info("should not appear")
-        log.warning("should appear")
-        output = buf.getvalue()
-        assert "should not appear" not in output
-        assert "should appear" in output
 
-    def test_fatal_alias_configures_critical_level(self):
-        log, buf = self._make_logger("FATAL")
-        log.error("should not appear")
-        log.critical("should appear")
-        output = buf.getvalue()
-        assert "should not appear" not in output
-        assert "should appear" in output
+# ─── create_loguru_logger validation ─────────────────────────────────
 
 
-# ─── create_loguru_logger with aliases ───────────────────────────────
-
-
-class TestCreateLoguruLoggerAliases:
-    """Tests that create_loguru_logger accepts level aliases."""
-
-    def test_warn_alias(self):
-        _reset_loguru_state()
-        buf = io.StringIO()
-        log_format = "{level} - [{extra[context]}] {message}"
-
-        logger = create_loguru_logger("AliasTest", "WARN", None)
-
-        warning_no = loguru.logger.level("WARNING").no
-
-        def filt(record):
-            return record["extra"].get("context") == "AliasTest" and record["level"].no >= warning_no
-
-        loguru.logger.add(buf, colorize=False, format=log_format, level="TRACE", filter=filt)
-
-        logger.info("should not appear")
-        logger.warning("warn msg")
-        logger.error("err msg")
-
-        output = buf.getvalue()
-        assert "should not appear" not in output
-        assert "warn msg" in output
-        assert "err msg" in output
-
-    def test_fatal_alias(self):
-        _reset_loguru_state()
-        buf = io.StringIO()
-        log_format = "{level} - [{extra[context]}] {message}"
-
-        logger = create_loguru_logger("FatalTest", "FATAL", None)
-
-        critical_no = loguru.logger.level("CRITICAL").no
-
-        def filt(record):
-            return record["extra"].get("context") == "FatalTest" and record["level"].no >= critical_no
-
-        loguru.logger.add(buf, colorize=False, format=log_format, level="TRACE", filter=filt)
-
-        logger.error("should not appear")
-        logger.critical("fatal msg")
-
-        output = buf.getvalue()
-        assert "should not appear" not in output
-        assert "fatal msg" in output
+class TestCreateLoguruLoggerValidation:
+    """Tests that create_loguru_logger validates log levels."""
 
     def test_invalid_level_raises(self):
         _reset_loguru_state()
