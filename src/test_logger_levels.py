@@ -1,33 +1,26 @@
 import io
-import sys
-import threading
 import loguru
 import pytest
 
-import application_builder
 from application_builder import (
     ApplicationBuilder,
-    IConfiguration,
-    ILogger,
     LoguruLogger,
     create_loguru_logger,
     normalize_log_level,
-    _LOG_LEVEL_ALIASES,
-    _VALID_LOG_LEVELS,
+    reset_logger_state,
+    _ensure_loguru_initialized,
 )
 
 
 def _reset_loguru_state():
     """Reset loguru global state so each test starts clean."""
-    loguru.logger.remove()
-    application_builder._loguru_initialized = False
-    application_builder._loguru_sink_ids.clear()
+    reset_logger_state()
 
 
 def _capture_logger_output(log_context: str, log_level: str) -> tuple:
     """Create a logger writing to a StringIO and return (logger, buffer)."""
     _reset_loguru_state()
-    application_builder._ensure_loguru_initialized()
+    _ensure_loguru_initialized()
 
     buf = io.StringIO()
     resolved = normalize_log_level(log_level)
@@ -138,7 +131,7 @@ class TestLoggerLevelIsolation:
 
     def test_two_loggers_different_levels(self):
         _reset_loguru_state()
-        application_builder._ensure_loguru_initialized()
+        _ensure_loguru_initialized()
 
         buf_a = io.StringIO()
         buf_b = io.StringIO()

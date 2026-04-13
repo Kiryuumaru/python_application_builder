@@ -62,6 +62,23 @@ def _ensure_loguru_initialized():
     _loguru_initialized = True
 
 
+def reset_logger_state():
+    """Reset loguru logger state by removing all custom sinks.
+
+    Intended for use in tests to ensure clean state between test cases.
+    """
+    global _loguru_initialized
+    with _loguru_logger_lock:
+        for sink_id in _loguru_sink_ids:
+            try:
+                loguru.logger.remove(sink_id)
+            except ValueError:
+                pass
+        _loguru_sink_ids.clear()
+        loguru.logger.remove()
+        _loguru_initialized = False
+
+
 def create_loguru_logger(log_context: str, log_level: str, log_file: Optional[str]):
     log_format = '<fg 95,95,95>{time}</> <level>{level: <8}</> - [<fg 95,95,95>{extra[context]}</>] <level>{message}</>'
     resolved_level = normalize_log_level(log_level)
