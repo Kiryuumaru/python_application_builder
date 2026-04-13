@@ -273,3 +273,35 @@ class TestCreateLoguruLoggerValidation:
         _reset_loguru_state()
         with pytest.raises(ValueError, match="Invalid log level"):
             create_loguru_logger("BadTest", "BANANA", None)
+
+
+# ─── Duplicate sink prevention ───────────────────────────────────────
+
+
+class TestDuplicateSinkPrevention:
+    """Tests that create_loguru_logger does not add duplicate sinks for the same context."""
+
+    def test_no_duplicate_output_for_same_context(self):
+        _reset_loguru_state()
+
+        buf = io.StringIO()
+        log_format = "{level} - [{extra[context]}] {message}"
+
+        create_loguru_logger("DupCtx", "INFO", None)
+        create_loguru_logger("DupCtx", "INFO", None)
+        create_loguru_logger("DupCtx", "INFO", None)
+
+        info_no = loguru.logger.level("INFO").no
+
+        def ctx_filter(record):
+            return record["extra"].get("context") == "DupCtx" and record["level"].no >= info_no
+
+        loguru.logger.add(buf, colorize=False, format=log_format, level="TRACE", filter=ctx_filter)
+
+        bound = loguru.logger.bind(context="DupCtx")
+        bound.info("single message")
+
+        output = buf.getvalue()
+        assert output.count("single message") == 1, (
+            f"Expected exactly 1 occurrence but got {output.count('single message')}: {output!r}"
+        )
