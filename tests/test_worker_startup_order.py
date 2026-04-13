@@ -17,10 +17,12 @@ class _OrderTrackingWorker(Worker):
         super().__init__()
         self.logger = logger
         self.lifetime = lifetime
-        self.started_before_execute = None
+        self.app_was_started_before_execute = None
+        self._execute_called = threading.Event()
 
     def execute(self):
-        self.started_before_execute = self.lifetime.application_started.is_cancellation_requested
+        self.app_was_started_before_execute = self.lifetime.application_started.is_cancellation_requested
+        self._execute_called.set()
         self.wait_for_stop(timeout_seconds=0.1)
 
 
@@ -46,11 +48,10 @@ class TestWorkerStartupOrder:
 
         provider.start_hosted_services()
 
-        time.sleep(0.3)
-
         worker = _find_tracking_worker(provider)
         assert worker is not None
-        assert worker.started_before_execute is True
+        worker._execute_called.wait(timeout=5)
+        assert worker.app_was_started_before_execute is True
 
         provider.stop_hosted_services()
 
@@ -60,10 +61,9 @@ class TestWorkerStartupOrder:
 
         provider = app.build(auto_start_hosted_services=True)
 
-        time.sleep(0.3)
-
         worker = _find_tracking_worker(provider)
         assert worker is not None
-        assert worker.started_before_execute is False
+        worker._execute_called.wait(timeout=5)
+        assert worker.app_was_started_before_execute is False
 
         provider.stop_hosted_services()
