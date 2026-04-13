@@ -47,6 +47,7 @@ class DataProcessingWorker(Worker):
 |--------|-------------|
 | `execute()` | Abstract — implement your work loop here |
 | `is_stopping()` | Returns `True` when the worker has been asked to stop |
+| `stopping_token` | Property — `CancellationToken` cancelled when the worker stops |
 | `wait_for_stop(timeout)` | Blocks up to `timeout` seconds; returns `True` if stop was signaled |
 | `start()` | Starts the worker in a background thread (called by framework) |
 | `stop()` | Signals the worker to stop and waits up to 30 seconds for completion |
@@ -322,3 +323,26 @@ app.add_singleton(ISharedQueue, ThreadSafeQueue)
 app.add_worker(ProducerWorker)
 app.add_worker(ConsumerWorker)
 ```
+
+### Cascading Cancellation to Child Jobs
+
+Use `stopping_token` to propagate the worker's stop signal to jobs started via `JobManager`:
+
+```python
+class FrameStreamWorker(TimedWorker):
+    def __init__(self, job_manager: JobManager, logger: ILogger):
+        super().__init__(interval_seconds=2)
+        self.job_manager = job_manager
+        self.logger = logger
+
+    def do_work(self):
+        self.job_manager.start_job(
+            self._process_frame,
+            cancellation_token=self.stopping_token,
+        )
+
+    def _process_frame(self):
+        self.logger.info("Processing frame...")
+```
+
+When the worker stops, `stopping_token` is cancelled, which auto-cancels all child jobs that were given the token.
