@@ -5,46 +5,52 @@ applyTo: '**'
 
 ## Fix Hygiene
 
-**Failed fix = full revert.**
+### Fix Procedure
+
+1. **Find and analyze the problem** — MUST understand what is actually broken before touching code
+2. **Use proper diagnostic tools** — MUST use available tools (tracing, structured logs, debuggers, profilers, network tools, build diagnostics) to produce evidence of the root cause. MUST NOT guess based on reading code alone
+3. **Fix one thing at a time** — MUST make ONE focused change per attempt
+4. **Verify** — MUST confirm the fix works (build, test, or runtime check). If confirmed working, proceed to next issue
+5. **Undo on failure** — If the fix does NOT work, MUST undo the specific code changes from that attempt. MUST NOT use blanket `git revert` or `git checkout` that could destroy ongoing uncommitted work. MUST restore files to their pre-attempt state before trying a different approach
+
+### Prohibited
 
 - NEVER leave non-working code from failed fix attempts
 - NEVER apply fix B on top of failed fix A
 - NEVER comment out failed code instead of removing
+- NEVER guess at root cause without diagnostic evidence
+- NEVER make multiple unrelated changes in one fix attempt
 
 ---
 
 ## Zero Warnings
 
-Code MUST pass linting with 0 warnings and 0 errors. Every warning is a potential bug.
+Build MUST complete with 0 warnings and 0 errors. Every warning is a potential bug.
 
 ---
 
-## None Handling
+## Nullable Handling
 
-- For possibly None values, USE explicit checks: `if x is None: raise ValueError()`
-- For optional parameters, DECLARE with `Optional[T]` and provide defaults
-- For required dependencies, RAISE `ValueError` if resolution fails
-- MUST NOT use bare `except:` — always specify exception type
-- MUST NOT silently swallow None — check and handle explicitly
+The null-forgiving operator (`!`) is prohibited except when ALL conditions are met:
+1. Value is proven non-null at that point
+2. Compiler cannot infer this due to analysis limitations
+3. Comment explains why it is safe
+4. No reasonable restructuring alternative exists
 
----
-
-## Type Hints
-
-- MUST use type hints on all function signatures
-- MUST use type hints on `__init__` parameters for DI resolution
-- MUST use `Optional[T]` for nullable parameters
-- MUST use `List[T]` for multi-service injection
-- MUST import from `typing` module: `Any`, `Callable`, `Dict`, `List`, `Optional`, `Type`, `TypeVar`
+Nullable handling patterns:
+- For possibly null value, USE `?? throw new InvalidOperationException()`
+- For null check, USE `if (x is null) return;`
+- For optional value, DECLARE as nullable type `T?`
+- For constructor parameter, USE `?? throw new ArgumentNullException(nameof(param))`
 
 ---
 
 ## Reliability Principles
 
+- MUST make illegal states unrepresentable using the type system
 - MUST validate at boundaries by checking all inputs at system edges
-- MUST fail fast by raising early rather than propagating bad state
+- MUST fail fast by throwing early rather than propagating bad state
 - MUST be explicit and never rely on implicit behavior or defaults
-- MUST use `ABC` and `@abstractmethod` to enforce interface contracts
 
 ---
 
@@ -54,7 +60,7 @@ Code MUST pass linting with 0 warnings and 0 errors. Every warning is a potentia
 - NEVER assume a fix is needed without reproducing the issue
 - NEVER guess at behavior without checking the actual implementation
 - MUST read existing code before claiming it needs changes
-- MUST run tests or the application before stating something fails
+- MUST run tests or build before stating something fails
 
 ---
 
@@ -66,6 +72,41 @@ Code MUST pass linting with 0 warnings and 0 errors. Every warning is a potentia
 
 ---
 
+## Primary Constructors
+
+When a constructor only stores parameters without additional logic, USE primary constructors (C# 12).
+
+Traditional constructor (avoid when only storing):
+```csharp
+internal sealed class DomainEventDispatcher : IDomainEventDispatcher
+{
+    private readonly IEnumerable<IDomainEventHandler> _handlers;
+
+    public DomainEventDispatcher(IEnumerable<IDomainEventHandler> handlers)
+    {
+        _handlers = handlers;
+    }
+
+    public void DoWork() => _handlers.ToList();
+}
+```
+
+Primary constructor (preferred):
+```csharp
+internal sealed class DomainEventDispatcher(IEnumerable<IDomainEventHandler> handlers) : IDomainEventDispatcher
+{
+    public void DoWork() => handlers.ToList();
+}
+```
+
+Primary constructor rules:
+- USE when constructor only assigns parameters to fields
+- USE parameter name directly in methods (no underscore prefix)
+- KEEP traditional constructor when validation or transformation logic is needed
+- KEEP traditional constructor when multiple constructors are required
+
+---
+
 ## Commenting
 
 ### Core Principle
@@ -74,16 +115,21 @@ Comments exist for future readers with no conversation context. The codebase sta
 
 ### Prohibited Comments
 
-- NEVER use `# TODO:` comments
-- NEVER use `# HACK:` comments
-- NEVER use `# FIXME:` comments
-- NEVER use `# type: ignore` without justification comment
-- NEVER use `# noqa` without justification comment
+- NEVER use `// TODO:` comments
+- NEVER use `// HACK:` comments
+- NEVER use `// FIXME:` comments
+- NEVER use `#pragma warning disable`
+- NEVER use `[SuppressMessage]` attributes (exception: `[UnconditionalSuppressMessage]` for AOT/trimming when no workaround exists)
+- NEVER use `var x = value!;` without justification comment
 - NEVER write comments referencing prompts: "As requested", "Per instruction", "Added because asked"
 - NEVER write comments referencing conversation: "As discussed", "Per our conversation", "Following the plan"
 - NEVER write meta-comments: "NEW:", "CHANGED:", "This is the fix"
-- NEVER write obvious descriptions: "Loop through list", "Return result", "Check if None"
+- NEVER write obvious descriptions: "Loop through list", "Return result", "Check if null"
 - NEVER write comments that would not make sense 2 years later without conversation context
+- NEVER write XML documentation on internal implementation classes
+- NEVER describe what code does when code is self-explanatory
+- NEVER ignore compiler warnings
+- NEVER suppress warnings instead of fixing root cause
 
 ### Required Comments
 
@@ -101,29 +147,20 @@ Comments exist for future readers with no conversation context. The codebase sta
 
 ---
 
-## Docstrings
+## XML Documentation
 
-- MUST use docstrings on public ABC interfaces and their methods
-- MUST use docstrings on `ApplicationBuilder` public methods
-- MUST NOT add docstrings to trivial internal helper methods where the name is self-explanatory
-- USE triple double quotes `"""` for all docstrings
-- USE imperative mood: "Get the service" not "Gets the service" or "Returns the service"
+XML docs (`///`) are required for public types shared across layers. Internal types do not need XML docs.
 
----
+Public cross-layer types MUST have XML docs:
+- Interfaces (public by design, used across layers)
+- Domain entities, value objects, records, enums
+- Application DTOs/models used by other layers
 
-## Exception Handling
+Internal types MUST NOT have XML docs:
+- Interface implementations (internal)
+- Infrastructure models/entities (internal)
+- Layer-internal helper classes
 
-- MUST use specific exception types: `ValueError`, `KeyError`, `TypeError`, `RuntimeError`
-- MUST NOT use bare `except:` or `except Exception:` without re-raising or logging
-- MUST NOT silently catch and ignore exceptions
-- MUST use `raise ... from e` for exception chaining when wrapping exceptions
-- Workers MUST catch exceptions inside the work loop to prevent thread death
-
----
-
-## Thread Safety
-
-- MUST use `threading.Lock` or `threading.RLock` for shared mutable state
-- MUST use `threading.Event` for signaling between threads
-- MUST NOT share mutable state between threads without synchronization
-- MUST use `daemon=True` for background threads that should not prevent shutdown
+Quick rule:
+- `public` + cross-layer = XML docs required
+- `internal` = no XML docs
