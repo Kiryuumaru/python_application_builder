@@ -1920,6 +1920,7 @@ class ServiceProvider:
                  decorators: Optional[List[Tuple[Type, Callable]]] = None):
         self._descriptors = descriptors
         self._singleton_instances: Dict[Type, Any] = {}
+        self._singleton_lock = threading.RLock()
         self._scoped_instances: Dict[Type, Any] = {}
         self._hosted_service_manager = None
         self._validate_scopes = validate_scopes
@@ -1980,9 +1981,11 @@ class ServiceProvider:
         if descriptor.lifetime == ServiceLifetime.SINGLETON:
             cache_key = (descriptor.implementation_type, descriptor.key)
             if cache_key not in self._singleton_instances:
-                instance = self._create_instance(descriptor)
-                instance = self._apply_decorators(descriptor.service_type, instance)
-                self._singleton_instances[cache_key] = instance
+                with self._singleton_lock:
+                    if cache_key not in self._singleton_instances:
+                        instance = self._create_instance(descriptor)
+                        instance = self._apply_decorators(descriptor.service_type, instance)
+                        self._singleton_instances[cache_key] = instance
             return self._singleton_instances[cache_key]
 
         elif descriptor.lifetime == ServiceLifetime.SCOPED:
@@ -2123,6 +2126,7 @@ class ServiceScope(ServiceProvider):
     def __init__(self, root_provider: ServiceProvider):
         self._descriptors = root_provider._descriptors
         self._singleton_instances = root_provider._singleton_instances
+        self._singleton_lock = root_provider._singleton_lock
         self._scoped_instances: Dict[Type, Any] = {}
         self._hosted_service_manager = None
         self._validate_scopes = root_provider._validate_scopes
