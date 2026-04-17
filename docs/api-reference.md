@@ -108,6 +108,11 @@ class ApplicationBuilder:
 | Method | Description |
 |--------|-------------|
 | `add_configuration(configure_action: Callable[[ConfigurationBuilder], None]) -> ApplicationBuilder` | Configure via the `ConfigurationBuilder` |
+| `add_json_file_configuration(file_path: str) -> ApplicationBuilder` | Add configuration from a JSON file |
+| `add_yaml_file_configuration(file_path: str) -> ApplicationBuilder` | Add configuration from a YAML file |
+| `add_environment_variables_configuration(prefix: str = None) -> ApplicationBuilder` | Add configuration from environment variables |
+| `add_command_line_configuration(args: List[str] = None, switch_mappings: Dict[str, str] = None) -> ApplicationBuilder` | Add configuration from command-line arguments |
+| `add_in_memory_configuration(initial_data: Dict[str, str] = None) -> ApplicationBuilder` | Add configuration from flat key-value pairs |
 | `add_configuration_dictionary(config_dict: Dict[str, Any]) -> ApplicationBuilder` | Add a nested dictionary (auto-flattened) |
 
 ### Validation

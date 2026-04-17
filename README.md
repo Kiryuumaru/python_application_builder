@@ -139,22 +139,33 @@ app = ApplicationBuilder()
 
 # Environment variables (loaded by default)
 # Use prefix to filter: MYAPP_DATABASE__HOST -> Database:HOST
-app.add_configuration(lambda b: b.add_environment_variables("MYAPP_"))
+app.add_environment_variables_configuration("MYAPP_")
 
 # JSON file
-app.add_configuration(lambda b: b.add_json_file("appsettings.json"))
+app.add_json_file_configuration("appsettings.json")
 
 # YAML file (.yaml or .yml)
-app.add_configuration(lambda b: b.add_yaml_file("appsettings.yaml"))
+app.add_yaml_file_configuration("appsettings.yaml")
 
 # Command-line arguments
-app.add_configuration(lambda b: b.add_command_line())
+app.add_command_line_configuration()
 
-# In-memory dictionary (highest priority — last wins)
+# In-memory flat key-value pairs
+app.add_in_memory_configuration({"App:Name": "MyApp", "App:Port": "8080"})
+
+# In-memory nested dictionary (highest priority — last wins)
 app.add_configuration_dictionary({
     "Database": {"Host": "localhost", "Port": 5432},
     "Logging": {"Level": "INFO"}
 })
+```
+
+Each alias method has an equivalent `add_configuration(lambda b: ...)` form for advanced usage:
+
+```python
+# These are equivalent:
+app.add_json_file_configuration("appsettings.json")
+app.add_configuration(lambda b: b.add_json_file("appsettings.json"))
 ```
 
 Later sources override earlier ones. Keys use colon-delimited hierarchy: `Database:Host`.

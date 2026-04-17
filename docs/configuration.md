@@ -23,9 +23,9 @@ Configuration is built from one or more providers. Each provider loads key-value
 app = ApplicationBuilder()
 
 # Priority: low → high (last wins)
-app.add_configuration(lambda b: b.add_environment_variables("MYAPP_"))    # 1st (lowest)
-app.add_configuration(lambda b: b.add_json_file("appsettings.json"))      # 2nd
-app.add_configuration(lambda b: b.add_command_line())                      # 3rd
+app.add_environment_variables_configuration("MYAPP_")                      # 1st (lowest)
+app.add_json_file_configuration("appsettings.json")                             # 2nd
+app.add_command_line_configuration()                                        # 3rd
 app.add_configuration_dictionary({"App": {"Debug": "true"}})              # 4th (highest)
 ```
 
@@ -37,6 +37,11 @@ Environment variables are loaded by default (with no prefix filter) when `Applic
 
 Reads from `os.environ`. An optional prefix filters which variables are included — the prefix is stripped from the key.
 
+```python
+app.add_environment_variables_configuration("MYAPP_")
+```
+
+Alternatively, using the lambda form:
 ```python
 app.add_configuration(lambda b: b.add_environment_variables("MYAPP_"))
 ```
@@ -54,6 +59,11 @@ Naming conventions:
 
 Reads from a JSON file. Nested objects are flattened with `:` separators. Arrays are stored as JSON strings.
 
+```python
+app.add_json_file_configuration("appsettings.json")
+```
+
+Alternatively, using the lambda form:
 ```python
 app.add_configuration(lambda b: b.add_json_file("appsettings.json"))
 ```
@@ -83,6 +93,11 @@ If the file does not exist, an empty configuration is returned (no error).
 Parses command-line arguments in several formats:
 
 ```python
+app.add_command_line_configuration()
+```
+
+Alternatively, using the lambda form:
+```python
 app.add_configuration(lambda b: b.add_command_line())
 ```
 
@@ -101,6 +116,13 @@ A flag without a value is stored as `"true"`:
 
 Switch mappings allow short aliases:
 ```python
+app.add_command_line_configuration(
+    switch_mappings={"--env": "Environment", "--db": "Database:Host"}
+)
+```
+
+Alternatively, using the lambda form:
+```python
 app.add_configuration(lambda b: b.add_command_line(
     switch_mappings={"--env": "Environment", "--db": "Database:Host"}
 ))
@@ -112,6 +134,14 @@ Underscores and double-underscores in keys are normalized to `:`.
 
 Adds a flat dictionary of pre-set values:
 
+```python
+app.add_in_memory_configuration({
+    "App:Name": "My App",
+    "App:Version": "1.0.0"
+})
+```
+
+Alternatively, using the lambda form:
 ```python
 app.add_configuration(lambda b: b.add_in_memory_collection({
     "App:Name": "My App",
