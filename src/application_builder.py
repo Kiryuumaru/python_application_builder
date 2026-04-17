@@ -258,7 +258,7 @@ class YamlFileConfigurationProvider(ConfigurationProvider):
             return {}
 
         try:
-            with open(self.file_path, 'r') as file:
+            with open(self.file_path, 'r', encoding='utf-8') as file:
                 yaml_data = yaml.safe_load(file)
 
             if not isinstance(yaml_data, dict):
