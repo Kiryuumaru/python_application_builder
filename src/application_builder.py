@@ -1802,12 +1802,12 @@ class ApplicationBuilder:
         configure_action(self._configuration_builder)
         return self
 
-    def add_json_configuration(self, file_path: str) -> 'ApplicationBuilder':
+    def add_json_file_configuration(self, file_path: str) -> 'ApplicationBuilder':
         """Add configuration from a JSON file."""
         self._configuration_builder.add_json_file(file_path)
         return self
 
-    def add_yaml_configuration(self, file_path: str) -> 'ApplicationBuilder':
+    def add_yaml_file_configuration(self, file_path: str) -> 'ApplicationBuilder':
         """Add configuration from a YAML file."""
         self._configuration_builder.add_yaml_file(file_path)
         return self

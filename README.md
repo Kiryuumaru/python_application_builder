@@ -142,10 +142,10 @@ app = ApplicationBuilder()
 app.add_environment_variables_configuration("MYAPP_")
 
 # JSON file
-app.add_json_configuration("appsettings.json")
+app.add_json_file_configuration("appsettings.json")
 
 # YAML file (.yaml or .yml)
-app.add_yaml_configuration("appsettings.yaml")
+app.add_yaml_file_configuration("appsettings.yaml")
 
 # Command-line arguments
 app.add_command_line_configuration()
@@ -164,7 +164,7 @@ Each alias method has an equivalent `add_configuration(lambda b: ...)` form for 
 
 ```python
 # These are equivalent:
-app.add_json_configuration("appsettings.json")
+app.add_json_file_configuration("appsettings.json")
 app.add_configuration(lambda b: b.add_json_file("appsettings.json"))
 ```
 

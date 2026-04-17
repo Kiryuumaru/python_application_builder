@@ -24,7 +24,7 @@ app = ApplicationBuilder()
 
 # Priority: low → high (last wins)
 app.add_environment_variables_configuration("MYAPP_")                      # 1st (lowest)
-app.add_json_configuration("appsettings.json")                             # 2nd
+app.add_json_file_configuration("appsettings.json")                             # 2nd
 app.add_command_line_configuration()                                        # 3rd
 app.add_configuration_dictionary({"App": {"Debug": "true"}})              # 4th (highest)
 ```
@@ -60,7 +60,7 @@ Naming conventions:
 Reads from a JSON file. Nested objects are flattened with `:` separators. Arrays are stored as JSON strings.
 
 ```python
-app.add_json_configuration("appsettings.json")
+app.add_json_file_configuration("appsettings.json")
 ```
 
 Alternatively, using the lambda form:

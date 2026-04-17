@@ -13,14 +13,14 @@ def _write_file(tmp_path: str, filename: str, content: str) -> str:
 
 
 class TestAddJsonConfiguration:
-    """Tests for ApplicationBuilder.add_json_configuration alias."""
+    """Tests for ApplicationBuilder.add_json_file_configuration alias."""
 
     def test_loads_json_values(self, tmp_path):
         path = _write_file(str(tmp_path), "app.json", json.dumps({
             "App": {"Name": "TestApp", "Port": 8080}
         }))
         app = ApplicationBuilder()
-        app.add_json_configuration(path)
+        app.add_json_file_configuration(path)
         config = app._configuration_builder.build()
 
         assert config.get("App:Name") == "TestApp"
@@ -29,7 +29,7 @@ class TestAddJsonConfiguration:
     def test_returns_self_for_chaining(self, tmp_path):
         path = _write_file(str(tmp_path), "app.json", json.dumps({"Key": "Value"}))
         app = ApplicationBuilder()
-        result = app.add_json_configuration(path)
+        result = app.add_json_file_configuration(path)
         assert result is app
 
     def test_equivalent_to_lambda(self, tmp_path):
@@ -38,7 +38,7 @@ class TestAddJsonConfiguration:
         }))
 
         app_alias = ApplicationBuilder()
-        app_alias.add_json_configuration(path)
+        app_alias.add_json_file_configuration(path)
         config_alias = app_alias._configuration_builder.build()
 
         app_lambda = ApplicationBuilder()
@@ -49,7 +49,7 @@ class TestAddJsonConfiguration:
 
     def test_missing_file_returns_empty(self):
         app = ApplicationBuilder()
-        app.add_json_configuration("/nonexistent/path/config.json")
+        app.add_json_file_configuration("/nonexistent/path/config.json")
         config = app._configuration_builder.build()
         assert config.get("Missing:Key") is None
 
@@ -58,7 +58,7 @@ class TestAddJsonConfiguration:
             "App": {"Name": "FromJson"}
         }))
         app = ApplicationBuilder()
-        app.add_json_configuration(path)
+        app.add_json_file_configuration(path)
         provider = app.build(auto_start_hosted_services=False)
         config = provider.get_required_service(IConfiguration)
 
@@ -66,12 +66,12 @@ class TestAddJsonConfiguration:
 
 
 class TestAddYamlConfiguration:
-    """Tests for ApplicationBuilder.add_yaml_configuration alias."""
+    """Tests for ApplicationBuilder.add_yaml_file_configuration alias."""
 
     def test_loads_yaml_values(self, tmp_path):
         path = _write_file(str(tmp_path), "app.yaml", "App:\n  Name: YamlApp\n  Debug: true\n")
         app = ApplicationBuilder()
-        app.add_yaml_configuration(path)
+        app.add_yaml_file_configuration(path)
         config = app._configuration_builder.build()
 
         assert config.get("App:Name") == "YamlApp"
@@ -80,14 +80,14 @@ class TestAddYamlConfiguration:
     def test_returns_self_for_chaining(self, tmp_path):
         path = _write_file(str(tmp_path), "app.yaml", "Key: Value\n")
         app = ApplicationBuilder()
-        result = app.add_yaml_configuration(path)
+        result = app.add_yaml_file_configuration(path)
         assert result is app
 
     def test_equivalent_to_lambda(self, tmp_path):
         path = _write_file(str(tmp_path), "app.yaml", "Logging:\n  Level: DEBUG\n")
 
         app_alias = ApplicationBuilder()
-        app_alias.add_yaml_configuration(path)
+        app_alias.add_yaml_file_configuration(path)
         config_alias = app_alias._configuration_builder.build()
 
         app_lambda = ApplicationBuilder()
@@ -98,21 +98,21 @@ class TestAddYamlConfiguration:
 
     def test_missing_file_returns_empty(self):
         app = ApplicationBuilder()
-        app.add_yaml_configuration("/nonexistent/path/config.yaml")
+        app.add_yaml_file_configuration("/nonexistent/path/config.yaml")
         config = app._configuration_builder.build()
         assert config.get("Missing:Key") is None
 
     def test_yml_extension(self, tmp_path):
         path = _write_file(str(tmp_path), "app.yml", "App:\n  Version: 2\n")
         app = ApplicationBuilder()
-        app.add_yaml_configuration(path)
+        app.add_yaml_file_configuration(path)
         config = app._configuration_builder.build()
         assert config.get("App:Version") == "2"
 
     def test_resolves_via_service_provider(self, tmp_path):
         path = _write_file(str(tmp_path), "app.yaml", "App:\n  Name: FromYaml\n")
         app = ApplicationBuilder()
-        app.add_yaml_configuration(path)
+        app.add_yaml_file_configuration(path)
         provider = app.build(auto_start_hosted_services=False)
         config = provider.get_required_service(IConfiguration)
 
@@ -229,8 +229,8 @@ class TestConfigurationAliasChaining:
 
         app = (
             ApplicationBuilder()
-            .add_json_configuration(json_path)
-            .add_yaml_configuration(yaml_path)
+            .add_json_file_configuration(json_path)
+            .add_yaml_file_configuration(yaml_path)
             .add_in_memory_configuration({"App:Debug": "true"})
         )
         config = app._configuration_builder.build()
