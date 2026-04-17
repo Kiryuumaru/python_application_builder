@@ -1802,6 +1802,32 @@ class ApplicationBuilder:
         configure_action(self._configuration_builder)
         return self
 
+    def add_json_configuration(self, file_path: str) -> 'ApplicationBuilder':
+        """Add configuration from a JSON file."""
+        self._configuration_builder.add_json_file(file_path)
+        return self
+
+    def add_yaml_configuration(self, file_path: str) -> 'ApplicationBuilder':
+        """Add configuration from a YAML file."""
+        self._configuration_builder.add_yaml_file(file_path)
+        return self
+
+    def add_environment_variables_configuration(self, prefix: str = None) -> 'ApplicationBuilder':
+        """Add configuration from environment variables."""
+        self._configuration_builder.add_environment_variables(prefix)
+        return self
+
+    def add_command_line_configuration(self, args: Optional[List[str]] = None,
+                                       switch_mappings: Optional[Dict[str, str]] = None) -> 'ApplicationBuilder':
+        """Add configuration from command-line arguments."""
+        self._configuration_builder.add_command_line(args, switch_mappings)
+        return self
+
+    def add_in_memory_configuration(self, initial_data: Dict[str, str] = None) -> 'ApplicationBuilder':
+        """Add configuration from an in-memory dictionary of flat key-value pairs."""
+        self._configuration_builder.add_in_memory_collection(initial_data)
+        return self
+
     def add_configuration_dictionary(self, config_dict: Dict[str, Any]) -> 'ApplicationBuilder':
         """Add configuration from a dictionary."""
         flat_dict: Dict[str, str] = {}
