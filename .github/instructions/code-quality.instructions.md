@@ -72,38 +72,25 @@ Nullable handling patterns:
 
 ---
 
-## Primary Constructors
+## Constructor Simplicity
 
-When a constructor only stores parameters without additional logic, USE primary constructors (C# 12).
+When a constructor only stores parameters, keep it minimal — assign parameters directly to instance attributes without additional logic.
 
-Traditional constructor (avoid when only storing):
-```csharp
-internal sealed class DomainEventDispatcher : IDomainEventDispatcher
-{
-    private readonly IEnumerable<IDomainEventHandler> _handlers;
+Simple constructor (preferred):
+```python
+class DomainEventDispatcher:
+    def __init__(self, handlers: List[IDomainEventHandler]):
+        self.handlers = handlers
 
-    public DomainEventDispatcher(IEnumerable<IDomainEventHandler> handlers)
-    {
-        _handlers = handlers;
-    }
-
-    public void DoWork() => _handlers.ToList();
-}
+    def do_work(self):
+        for handler in self.handlers:
+            handler.handle()
 ```
 
-Primary constructor (preferred):
-```csharp
-internal sealed class DomainEventDispatcher(IEnumerable<IDomainEventHandler> handlers) : IDomainEventDispatcher
-{
-    public void DoWork() => handlers.ToList();
-}
-```
-
-Primary constructor rules:
-- USE when constructor only assigns parameters to fields
-- USE parameter name directly in methods (no underscore prefix)
-- KEEP traditional constructor when validation or transformation logic is needed
-- KEEP traditional constructor when multiple constructors are required
+Constructor simplicity rules:
+- USE simple assignment when constructor only stores parameters
+- KEEP validation or transformation logic in the constructor when needed
+- MUST accept dependencies via `__init__` parameters with type hints
 
 ---
 

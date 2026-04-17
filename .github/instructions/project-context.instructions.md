@@ -26,7 +26,7 @@ Prioritize clean, correct design over compatibility. Fix naming mistakes and str
 
 ## Project Description
 
-Python Application Builder is a lightweight dependency injection framework for Python, inspired by .NET's Generic Host / IHostBuilder pattern. Single-module architecture providing:
+Python Application Builder is a lightweight dependency injection framework for Python built on clean architecture principles. Single-module architecture providing:
 
 - IoC container with automatic constructor injection
 - Service lifetimes: Singleton, Scoped, Transient
