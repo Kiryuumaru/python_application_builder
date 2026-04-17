@@ -11,7 +11,7 @@ A lightweight dependency injection framework for Python built on clean architect
 |---------|-------------|
 | **Dependency Injection** | IoC container with automatic constructor injection and multi-binding support |
 | **Service Lifetimes** | Singleton, Scoped, and Transient lifetimes with scope validation |
-| **Configuration** | Multi-source: environment variables, JSON files, command-line args, in-memory dictionaries |
+| **Configuration** | Multi-source: environment variables, JSON files, YAML files, command-line args, in-memory dictionaries |
 | **Typed Options** | Bind configuration sections to dataclasses via `IOptions` / `IOptionsSnapshot` / `IOptionsMonitor` |
 | **Background Workers** | `Worker` (free-running) and `TimedWorker` (interval-based) with graceful shutdown |
 | **Structured Logging** | Contextual logging backed by loguru with scoped enrichment |
@@ -143,6 +143,9 @@ app.add_configuration(lambda b: b.add_environment_variables("MYAPP_"))
 
 # JSON file
 app.add_configuration(lambda b: b.add_json_file("appsettings.json"))
+
+# YAML file (.yaml or .yml)
+app.add_configuration(lambda b: b.add_yaml_file("appsettings.yaml"))
 
 # Command-line arguments
 app.add_configuration(lambda b: b.add_command_line())

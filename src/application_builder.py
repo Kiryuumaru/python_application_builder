@@ -7,6 +7,7 @@ import sys
 import time
 import uuid
 import loguru
+import yaml
 import threading
 from dataclasses import dataclass, field, fields as dataclass_fields, MISSING
 from abc import ABC, abstractmethod
@@ -245,6 +246,46 @@ class JsonFileConfigurationProvider(ConfigurationProvider):
         return result
 
 
+class YamlFileConfigurationProvider(ConfigurationProvider):
+    """Configuration provider that reads from a YAML file."""
+
+    def __init__(self, file_path: str):
+        self.file_path = file_path
+
+    def load(self) -> Dict[str, str]:
+        """Loads configuration from a YAML file."""
+        if not os.path.exists(self.file_path):
+            return {}
+
+        try:
+            with open(self.file_path, 'r') as file:
+                yaml_data = yaml.safe_load(file)
+
+            if not isinstance(yaml_data, dict):
+                return {}
+
+            return self._flatten_dict(yaml_data)
+        except Exception as e:
+            logger.error(f"Error loading configuration from {self.file_path}: {e}")
+            return {}
+
+    def _flatten_dict(self, data: Dict, prefix: str = "") -> Dict[str, str]:
+        """Flattens a nested dictionary into colon-delimited key-value pairs."""
+        result = {}
+        for key, value in data.items():
+            new_key = f"{prefix}:{key}" if prefix else key
+
+            if isinstance(value, dict):
+                nested = self._flatten_dict(value, new_key)
+                result.update(nested)
+            elif isinstance(value, (list, tuple)):
+                result[new_key] = json.dumps(value)
+            else:
+                result[new_key] = str(value)
+
+        return result
+
+
 class MemoryConfigurationProvider(ConfigurationProvider):
     """Configuration provider that reads from an in-memory dictionary."""
 
@@ -331,6 +372,10 @@ class ConfigurationBuilder:
     def add_json_file(self, file_path: str) -> 'ConfigurationBuilder':
         """Adds a configuration provider that reads from a JSON file."""
         return self.add_provider(JsonFileConfigurationProvider(file_path))
+
+    def add_yaml_file(self, file_path: str) -> 'ConfigurationBuilder':
+        """Adds a configuration provider that reads from a YAML file."""
+        return self.add_provider(YamlFileConfigurationProvider(file_path))
 
     def add_in_memory_collection(self, initial_data: Dict[str, str] = None) -> 'ConfigurationBuilder':
         """Adds a configuration provider that reads from an in-memory dictionary."""
