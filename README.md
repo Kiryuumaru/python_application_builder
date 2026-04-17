@@ -1,6 +1,6 @@
 ﻿# Python Application Builder
 
-A dependency injection framework for Python inspired by .NET's Generic Host and `IHostBuilder` pattern. Ships as a single module with everything needed for building structured, composable applications: an IoC container with automatic constructor injection, multi-source configuration, background workers, structured logging, cooperative cancellation, job management, and a middleware pipeline.
+A lightweight dependency injection framework for Python built on clean architecture principles. Ships as a single module with everything needed for building structured, composable applications: an IoC container with automatic constructor injection, multi-source configuration, background workers, structured logging, cooperative cancellation, job management, and a middleware pipeline.
 
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE.txt)
@@ -16,7 +16,7 @@ A dependency injection framework for Python inspired by .NET's Generic Host and 
 | **Background Workers** | `Worker` (free-running) and `TimedWorker` (interval-based) with graceful shutdown |
 | **Structured Logging** | Contextual logging backed by loguru with scoped enrichment |
 | **Job Management** | `JobManager` for concurrent background tasks with cancellation and concurrency limits |
-| **Cancellation Tokens** | Cooperative cancellation modeled after C#'s `CancellationToken` / `CancellationTokenSource` |
+| **Cancellation Tokens** | Cooperative cancellation via `CancellationToken` / `CancellationTokenSource` |
 | **Middleware Pipeline** | Composable `MiddlewarePipeline` for request/context processing |
 | **Keyed Services** | Named service registrations resolved by key |
 | **Service Decoration** | Wrap existing registrations with decorator factories |
@@ -257,4 +257,4 @@ MIT License — see [LICENSE.txt](LICENSE.txt) for details.
 ## Acknowledgments
 
 - [loguru](https://github.com/Delgan/loguru) — structured logging
-- [.NET Generic Host](https://learn.microsoft.com/en-us/dotnet/core/extensions/generic-host) — architectural inspiration
+- Clean architecture and dependency injection design patterns

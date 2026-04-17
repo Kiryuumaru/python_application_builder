@@ -1550,7 +1550,7 @@ class ServiceDescriptor:
         self.key = key
 
 class ApplicationBuilder:
-    """Container for service registrations, similar to C#'s host builder pattern."""
+    """Container for service registrations and the entry point for building an application."""
 
     def __init__(self):
         self._descriptors: List[ServiceDescriptor] = []
@@ -1913,7 +1913,7 @@ class ApplicationBuilder:
                 lifetime.notify_stopped()
 
 class ServiceProvider:
-    """Resolves services from the service collection, similar to C#'s IServiceProvider."""
+    """Resolves services from the service collection using dependency injection."""
 
     def __init__(self, descriptors: List[ServiceDescriptor],
                  validate_scopes: bool = False,
@@ -2188,8 +2188,7 @@ class OperationCanceledException(Exception):
 
 class CancellationToken:
     """
-    A token that can be used to signal cancellation to operations.
-    Similar to C#'s CancellationToken.
+    A token that can be used to signal cooperative cancellation to operations.
     """
 
     def __init__(self, cancelled: bool = False):
@@ -2306,7 +2305,6 @@ class CancellationTokenRegistration:
 class CancellationTokenSource:
     """
     Provides a token that can be cancelled and is the source of cancellation tokens.
-    Similar to C#'s CancellationTokenSource.
     """
 
     def __init__(self):

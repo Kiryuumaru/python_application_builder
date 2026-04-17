@@ -13,7 +13,7 @@ This document covers cancellation tokens, job management, the middleware pipelin
 
 ## Cancellation Tokens
 
-Cooperative cancellation modeled after C#'s `CancellationToken` / `CancellationTokenSource`. A source controls the token; consumers check the token for cancellation.
+Cooperative cancellation using the `CancellationToken` / `CancellationTokenSource` pattern. A source controls the token; consumers check the token for cancellation.
 
 ### CancellationTokenSource
 
