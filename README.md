@@ -33,9 +33,14 @@ pip install -r requirements.txt
 
 External dependencies: [loguru](https://github.com/Delgan/loguru) 0.7.3 and [PyYAML](https://github.com/yaml/pyyaml) 6.0.3.
 
-### AI Agent Init
+### AI Agent Prompts
 
-To scaffold a new project using this framework with an AI agent, copy the entire contents of [`AGENT_INIT.md`](AGENT_INIT.md) into your agent's prompt.
+| Prompt | Use When |
+|--------|----------|
+| [`AGENT_INIT.md`](AGENT_INIT.md) | Scaffolding a **new** project from scratch |
+| [`AGENT_RESUME.md`](AGENT_RESUME.md) | Converting an **existing** project to this framework |
+
+Copy the entire contents of the relevant file into your AI agent's prompt.
 
 ## Documentation
 
