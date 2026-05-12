@@ -12,12 +12,14 @@ Create the following directory layout:
 
 ```
 <project_root>/
+├── .github/
+│   └── instructions/              <- Agent instruction files (copied from the repository)
 ├── docs/
-│   └── application_builder/    <- Framework documentation (copied from the repository)
+│   └── application_builder/       <- Framework documentation (copied from the repository)
 ├── src/
-│   ├── application_builder.py   <- Framework module (copied from the repository)
-│   ├── main.py                  <- Application entry point
-│   └── requirements.txt         <- Dependencies
+│   ├── application_builder.py     <- Framework module (copied from the repository)
+│   ├── main.py                    <- Application entry point
+│   └── requirements.txt           <- Dependencies
 └── tests/
     └── (test files)
 ```
@@ -40,6 +42,12 @@ python -c "import shutil, tempfile, os; shutil.copy2(os.path.join(tempfile.gette
 
 ```bash
 python -c "import shutil, tempfile, os; src=os.path.join(tempfile.gettempdir(), 'pab_source', 'docs'); dst='docs/application_builder'; os.makedirs(dst, exist_ok=True); [shutil.copy2(os.path.join(src, f), os.path.join(dst, f)) for f in os.listdir(src) if os.path.isfile(os.path.join(src, f))]"
+```
+
+Copy the agent instruction files into your project:
+
+```bash
+python -c "import shutil, tempfile, os; src=os.path.join(tempfile.gettempdir(), 'pab_source', '.github', 'instructions'); dst=os.path.join('.github', 'instructions'); os.makedirs(dst, exist_ok=True); [shutil.copy2(os.path.join(src, f), os.path.join(dst, f)) for f in os.listdir(src) if os.path.isfile(os.path.join(src, f))]"
 ```
 
 ---
@@ -102,6 +110,15 @@ After completing all steps, the project structure MUST look like this:
 
 ```
 <project_root>/
+├── .github/
+│   └── instructions/
+│       ├── agent-terminal.instructions.md
+│       ├── architecture.instructions.md
+│       ├── code-quality.instructions.md
+│       ├── documentation.instructions.md
+│       ├── project-context.instructions.md
+│       ├── rule-style.instructions.md
+│       └── workflow.instructions.md
 ├── docs/
 │   └── application_builder/
 │       ├── advanced-features.md
