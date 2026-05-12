@@ -31,7 +31,7 @@ app.run()
 pip install -r requirements.txt
 ```
 
-The only external dependency is [loguru](https://github.com/Delgan/loguru) 0.7.3.
+External dependencies: [loguru](https://github.com/Delgan/loguru) 0.7.3 and [PyYAML](https://github.com/yaml/pyyaml) 6.0.3.
 
 ### AI Agent Init
 
