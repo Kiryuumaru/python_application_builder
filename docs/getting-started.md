@@ -126,7 +126,7 @@ app.run()
 When you call `app.run()` (or `app.build()`), the framework:
 
 1. Builds the `Configuration` from all registered configuration providers
-2. Registers built-in services: `IConfiguration`, `ILogger`, `JobManager`, `CliRunnerService`, `IHostEnvironment`, `IHostApplicationLifetime`, `MiddlewarePipeline`
+2. Registers built-in services: `IConfiguration`, `ILogger`, `JobManager`, `CliRunnerService`, `IHostEnvironment`, `IHostApplicationLifetime`, `MiddlewarePipeline`, `ScopeFactory`, `ServiceProvider`
 3. Creates a `ServiceProvider` that resolves services on demand
 4. Starts all registered workers in dedicated background threads
 5. Blocks the main thread until a shutdown signal (Ctrl+C / SIGTERM)
