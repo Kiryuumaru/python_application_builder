@@ -255,6 +255,10 @@ service = provider.get_required_service(IMyService)
 assert service is not None
 ```
 
+## AI Agent Init
+
+To scaffold a new project using this framework with an AI agent, copy the entire contents of [`AGENT_INIT.md`](AGENT_INIT.md) into your agent's prompt.
+
 ## Development Setup
 
 ```bash

@@ -1,11 +1,5 @@
 # Initialize Python Application Builder Project
 
-Copy this entire document into your AI agent prompt to scaffold a new project using the [python_application_builder](https://github.com/Kiryuumaru/python_application_builder) framework.
-
----
-
-## Instructions
-
 You are initializing a Python project that uses the **Python Application Builder** framework — a lightweight dependency injection framework built on clean architecture principles. It ships as a single module (`application_builder.py`) providing an IoC container with automatic constructor injection, multi-source configuration, background workers, structured logging, cooperative cancellation, job management, and a middleware pipeline.
 
 Follow these steps to set up the project in the current directory.
