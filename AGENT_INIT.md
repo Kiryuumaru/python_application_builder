@@ -2,8 +2,7 @@
 
 You are initializing a Python project that uses the **Python Application Builder** framework — a lightweight dependency injection framework built on clean architecture principles. It ships as a single module (`application_builder.py`) providing an IoC container with automatic constructor injection, multi-source configuration, background workers, structured logging, cooperative cancellation, job management, and a middleware pipeline.
 
-**Repository:** <https://github.com/Kiryuumaru/python_application_builder>
-Refer to the repository README, `docs/` folder, and `.github/instructions/` for detailed documentation, architecture rules, and code quality guidelines.
+Refer to the [python_application_builder](https://github.com/Kiryuumaru/python_application_builder) repository for more detailed information and guidelines.
 
 Follow these steps to set up the project in the current directory.
 
