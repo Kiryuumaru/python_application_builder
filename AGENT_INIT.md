@@ -27,9 +27,20 @@ Create the following directory layout:
 Clone the framework repository and copy the core module into your project:
 
 ```bash
-git clone https://github.com/Kiryuumaru/python_application_builder.git /tmp/pab_source
-cp /tmp/pab_source/src/application_builder.py src/application_builder.py
+git clone https://github.com/Kiryuumaru/python_application_builder.git pab_source
 ```
+
+Then copy the framework module into your `src/` directory:
+
+- **Windows (Command Prompt):** `copy pab_source\src\application_builder.py src\application_builder.py`
+- **Windows (PowerShell):** `Copy-Item pab_source/src/application_builder.py -Destination src/application_builder.py`
+- **macOS / Linux:** `cp pab_source/src/application_builder.py src/application_builder.py`
+
+After copying, you can delete the cloned repository:
+
+- **Windows (Command Prompt):** `rmdir /s /q pab_source`
+- **Windows (PowerShell):** `Remove-Item -Recurse -Force pab_source`
+- **macOS / Linux:** `rm -rf pab_source`
 
 ---
 
