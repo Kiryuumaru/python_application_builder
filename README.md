@@ -5,24 +5,6 @@ A lightweight dependency injection framework for Python built on clean architect
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE.txt)
 
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Dependency Injection** | IoC container with automatic constructor injection and multi-binding support |
-| **Service Lifetimes** | Singleton, Scoped, and Transient lifetimes with scope validation |
-| **Configuration** | Multi-source: environment variables, JSON files, YAML files, command-line args, in-memory dictionaries |
-| **Typed Options** | Bind configuration sections to dataclasses via `IOptions` / `IOptionsSnapshot` / `IOptionsMonitor` |
-| **Background Workers** | `Worker` (free-running) and `TimedWorker` (interval-based) with graceful shutdown |
-| **Structured Logging** | Contextual logging backed by loguru with scoped enrichment |
-| **Job Management** | `JobManager` for concurrent background tasks with cancellation and concurrency limits |
-| **Cancellation Tokens** | Cooperative cancellation via `CancellationToken` / `CancellationTokenSource` |
-| **Middleware Pipeline** | Composable `MiddlewarePipeline` for request/context processing |
-| **Keyed Services** | Named service registrations resolved by key |
-| **Service Decoration** | Wrap existing registrations with decorator factories |
-| **Host Lifetime** | `IHostApplicationLifetime` events for started/stopping/stopped hooks |
-| **CLI Runner** | `CliRunnerService` for running external processes under job management |
-
 ## Quick Start
 
 ```python
@@ -51,12 +33,17 @@ pip install -r requirements.txt
 
 The only external dependency is [loguru](https://github.com/Delgan/loguru) 0.7.3.
 
+### AI Agent Init
+
+To scaffold a new project using this framework with an AI agent, copy the entire contents of [`AGENT_INIT.md`](AGENT_INIT.md) into your agent's prompt.
+
 ## Documentation
 
 Full documentation lives in the [`docs/`](docs/) folder:
 
 | Document | Description |
 |----------|-------------|
+| [Features](docs/features.md) | Complete feature list |
 | [Getting Started](docs/getting-started.md) | Installation, first application, project structure |
 | [Dependency Injection](docs/dependency-injection.md) | Service registration, lifetimes, scopes, keyed services, decoration |
 | [Configuration](docs/configuration.md) | Providers, hierarchical keys, typed access, options pattern |
@@ -254,10 +241,6 @@ provider = app.build(auto_start_hosted_services=False)
 service = provider.get_required_service(IMyService)
 assert service is not None
 ```
-
-## AI Agent Init
-
-To scaffold a new project using this framework with an AI agent, copy the entire contents of [`AGENT_INIT.md`](AGENT_INIT.md) into your agent's prompt.
 
 ## Development Setup
 
