@@ -88,6 +88,38 @@ Produces:
 
 If the file does not exist, an empty configuration is returned (no error).
 
+### YAML File
+
+Reads from a YAML file (`.yaml` or `.yml`). Nested objects are flattened with `:` separators. Arrays are stored as JSON strings.
+
+```python
+app.add_yaml_file_configuration("appsettings.yaml")
+```
+
+Alternatively, using the lambda form:
+```python
+app.add_configuration(lambda b: b.add_yaml_file("appsettings.yaml"))
+```
+
+Given `appsettings.yaml`:
+```yaml
+Database:
+  Host: localhost
+  Port: 5432
+AllowedOrigins:
+  - http://localhost:3000
+  - https://example.com
+```
+
+Produces:
+| Key | Value |
+|-----|-------|
+| `Database:Host` | `localhost` |
+| `Database:Port` | `5432` |
+| `AllowedOrigins` | `["http://localhost:3000", "https://example.com"]` |
+
+If the file does not exist, an empty configuration is returned (no error).
+
 ### Command-Line Arguments
 
 Parses command-line arguments in several formats:

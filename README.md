@@ -186,33 +186,6 @@ app.add_worker(DataWorker)
 app.add_worker(PingWorker)
 ```
 
-## Samples
-
-The [`samples/`](samples/) directory contains 20 runnable examples covering every major feature. See the [Samples Guide](docs/samples.md) for details.
-
-| Sample | Feature |
-|--------|---------|
-| `build_runner` | Multi-binding with `List[T]` injection |
-| `chat_room` | Scoped services and multi-binding formatters |
-| `cli_args` | Command-line argument configuration |
-| `data_pipeline` | Multi-worker producer/consumer |
-| `decorated_services` | Service decoration (logging + caching) |
-| `disposable_scopes` | `IDisposable` cleanup in scopes |
-| `env_aware` | `IHostEnvironment` and environment-based config |
-| `event_bus` | Transient/scoped/singleton lifetime interplay |
-| `health_dashboard` | Pre-built singleton via `add_singleton_instance` |
-| `inventory_cli` | Combined singleton + scoped services |
-| `job_scheduler` | `JobManager` background task execution |
-| `keyed_services` | Keyed/named service resolution |
-| `lifecycle_hooks` | `IHostApplicationLifetime` events |
-| `middleware_demo` | `MiddlewarePipeline` composition |
-| `multi_config` | Multi-source configuration with priority |
-| `plugin_system` | Factory-based dynamic plugin selection |
-| `service_collection` | `try_add`, `replace`, `remove_all` APIs |
-| `task_queue` | Job queue with concurrency limits |
-| `typed_options` | `configure_options` for dataclass binding |
-| `validated_app` | Build-time and scope validation |
-
 ## Testing
 
 Constructor injection makes testing straightforward — pass mocks directly:
@@ -258,4 +231,5 @@ MIT License — see [LICENSE.txt](LICENSE.txt) for details.
 ## Acknowledgments
 
 - [loguru](https://github.com/Delgan/loguru) — structured logging
+- [PyYAML](https://github.com/yaml/pyyaml) — YAML configuration support
 - Clean architecture and dependency injection design patterns

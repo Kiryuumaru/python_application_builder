@@ -49,6 +49,7 @@ cd src
 | Dependency | Purpose |
 |------------|---------|
 | `loguru==0.7.3` | Structured logging |
+| `pyyaml==6.0.3` | YAML configuration support |
 
 ---
 

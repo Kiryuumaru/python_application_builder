@@ -108,6 +108,7 @@ After completing all steps, the project structure MUST look like this:
 │       ├── api-reference.md
 │       ├── configuration.md
 │       ├── dependency-injection.md
+│       ├── features.md
 │       ├── getting-started.md
 │       ├── logging.md
 │       ├── samples.md
