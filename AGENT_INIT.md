@@ -24,23 +24,17 @@ Create the following directory layout:
 
 ## Step 2: Install the Framework
 
-Clone the framework repository and copy the core module into your project:
+Clone the framework repository into a temporary directory and copy the core module into your project. The following uses Python to resolve the OS temp folder, making it cross-platform:
 
 ```bash
-git clone https://github.com/Kiryuumaru/python_application_builder.git pab_source
+git clone https://github.com/Kiryuumaru/python_application_builder.git "$(python -c "import tempfile, os; print(os.path.join(tempfile.gettempdir(), 'pab_source'))")"
 ```
 
 Then copy the framework module into your `src/` directory:
 
-- **Windows (Command Prompt):** `copy pab_source\src\application_builder.py src\application_builder.py`
-- **Windows (PowerShell):** `Copy-Item pab_source/src/application_builder.py -Destination src/application_builder.py`
-- **macOS / Linux:** `cp pab_source/src/application_builder.py src/application_builder.py`
-
-After copying, you can delete the cloned repository:
-
-- **Windows (Command Prompt):** `rmdir /s /q pab_source`
-- **Windows (PowerShell):** `Remove-Item -Recurse -Force pab_source`
-- **macOS / Linux:** `rm -rf pab_source`
+```bash
+python -c "import shutil, tempfile, os; shutil.copy2(os.path.join(tempfile.gettempdir(), 'pab_source', 'src', 'application_builder.py'), os.path.join('src', 'application_builder.py'))"
+```
 
 ---
 
