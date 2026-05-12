@@ -45,6 +45,7 @@ Python Application Builder is a lightweight dependency injection framework for P
 |-----------|------------|
 | Language | Python 3.8+ |
 | Logging | loguru 0.7.3 |
+| YAML | pyyaml 6.0.3 |
 | Threading | stdlib `threading` |
 | Configuration | stdlib `json`, `os.environ` |
 | IDE | Visual Studio (Python Tools) |

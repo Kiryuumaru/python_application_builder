@@ -5,24 +5,6 @@ A lightweight dependency injection framework for Python built on clean architect
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE.txt)
 
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Dependency Injection** | IoC container with automatic constructor injection and multi-binding support |
-| **Service Lifetimes** | Singleton, Scoped, and Transient lifetimes with scope validation |
-| **Configuration** | Multi-source: environment variables, JSON files, YAML files, command-line args, in-memory dictionaries |
-| **Typed Options** | Bind configuration sections to dataclasses via `IOptions` / `IOptionsSnapshot` / `IOptionsMonitor` |
-| **Background Workers** | `Worker` (free-running) and `TimedWorker` (interval-based) with graceful shutdown |
-| **Structured Logging** | Contextual logging backed by loguru with scoped enrichment |
-| **Job Management** | `JobManager` for concurrent background tasks with cancellation and concurrency limits |
-| **Cancellation Tokens** | Cooperative cancellation via `CancellationToken` / `CancellationTokenSource` |
-| **Middleware Pipeline** | Composable `MiddlewarePipeline` for request/context processing |
-| **Keyed Services** | Named service registrations resolved by key |
-| **Service Decoration** | Wrap existing registrations with decorator factories |
-| **Host Lifetime** | `IHostApplicationLifetime` events for started/stopping/stopped hooks |
-| **CLI Runner** | `CliRunnerService` for running external processes under job management |
-
 ## Quick Start
 
 ```python
@@ -49,7 +31,16 @@ app.run()
 pip install -r requirements.txt
 ```
 
-The only external dependency is [loguru](https://github.com/Delgan/loguru) 0.7.3.
+External dependencies: [loguru](https://github.com/Delgan/loguru) 0.7.3 and [PyYAML](https://github.com/yaml/pyyaml) 6.0.3.
+
+### AI Agent Prompts
+
+| Prompt | Use When |
+|--------|----------|
+| [`AGENT_INIT.md`](AGENT_INIT.md) | Scaffolding a **new** project from scratch |
+| [`AGENT_RESUME.md`](AGENT_RESUME.md) | Converting an **existing** project to this framework |
+
+Copy the entire contents of the relevant file into your AI agent's prompt.
 
 ## Documentation
 
@@ -57,6 +48,7 @@ Full documentation lives in the [`docs/`](docs/) folder:
 
 | Document | Description |
 |----------|-------------|
+| [Features](docs/features.md) | Complete feature list |
 | [Getting Started](docs/getting-started.md) | Installation, first application, project structure |
 | [Dependency Injection](docs/dependency-injection.md) | Service registration, lifetimes, scopes, keyed services, decoration |
 | [Configuration](docs/configuration.md) | Providers, hierarchical keys, typed access, options pattern |
@@ -199,33 +191,6 @@ app.add_worker(DataWorker)
 app.add_worker(PingWorker)
 ```
 
-## Samples
-
-The [`samples/`](samples/) directory contains 20 runnable examples covering every major feature. See the [Samples Guide](docs/samples.md) for details.
-
-| Sample | Feature |
-|--------|---------|
-| `build_runner` | Multi-binding with `List[T]` injection |
-| `chat_room` | Scoped services and multi-binding formatters |
-| `cli_args` | Command-line argument configuration |
-| `data_pipeline` | Multi-worker producer/consumer |
-| `decorated_services` | Service decoration (logging + caching) |
-| `disposable_scopes` | `IDisposable` cleanup in scopes |
-| `env_aware` | `IHostEnvironment` and environment-based config |
-| `event_bus` | Transient/scoped/singleton lifetime interplay |
-| `health_dashboard` | Pre-built singleton via `add_singleton_instance` |
-| `inventory_cli` | Combined singleton + scoped services |
-| `job_scheduler` | `JobManager` background task execution |
-| `keyed_services` | Keyed/named service resolution |
-| `lifecycle_hooks` | `IHostApplicationLifetime` events |
-| `middleware_demo` | `MiddlewarePipeline` composition |
-| `multi_config` | Multi-source configuration with priority |
-| `plugin_system` | Factory-based dynamic plugin selection |
-| `service_collection` | `try_add`, `replace`, `remove_all` APIs |
-| `task_queue` | Job queue with concurrency limits |
-| `typed_options` | `configure_options` for dataclass binding |
-| `validated_app` | Build-time and scope validation |
-
 ## Testing
 
 Constructor injection makes testing straightforward — pass mocks directly:
@@ -271,4 +236,5 @@ MIT License — see [LICENSE.txt](LICENSE.txt) for details.
 ## Acknowledgments
 
 - [loguru](https://github.com/Delgan/loguru) — structured logging
+- [PyYAML](https://github.com/yaml/pyyaml) — YAML configuration support
 - Clean architecture and dependency injection design patterns

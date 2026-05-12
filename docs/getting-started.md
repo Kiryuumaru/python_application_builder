@@ -17,7 +17,7 @@ cd python_application_builder/src
 pip install -r requirements.txt
 ```
 
-The only external dependency is [loguru](https://github.com/Delgan/loguru) 0.7.3 for structured logging.
+External dependencies: [loguru](https://github.com/Delgan/loguru) 0.7.3 for structured logging and [PyYAML](https://github.com/yaml/pyyaml) 6.0.3 for YAML configuration support.
 
 ## Project Structure
 
@@ -126,7 +126,7 @@ app.run()
 When you call `app.run()` (or `app.build()`), the framework:
 
 1. Builds the `Configuration` from all registered configuration providers
-2. Registers built-in services: `IConfiguration`, `ILogger`, `JobManager`, `CliRunnerService`, `IHostEnvironment`, `IHostApplicationLifetime`, `MiddlewarePipeline`
+2. Registers built-in services: `IConfiguration`, `ILogger`, `JobManager`, `CliRunnerService`, `IHostEnvironment`, `IHostApplicationLifetime`, `MiddlewarePipeline`, `ScopeFactory`, `ServiceProvider`
 3. Creates a `ServiceProvider` that resolves services on demand
 4. Starts all registered workers in dedicated background threads
 5. Blocks the main thread until a shutdown signal (Ctrl+C / SIGTERM)

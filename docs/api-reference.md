@@ -282,6 +282,7 @@ class ConfigurationBuilder:
 | `add_provider(provider: ConfigurationProvider) -> ConfigurationBuilder` | Add a custom provider |
 | `add_environment_variables(prefix=None) -> ConfigurationBuilder` | Add environment variables provider |
 | `add_json_file(file_path: str) -> ConfigurationBuilder` | Add JSON file provider |
+| `add_yaml_file(file_path: str) -> ConfigurationBuilder` | Add YAML file provider |
 | `add_in_memory_collection(initial_data: Dict[str, str]) -> ConfigurationBuilder` | Add in-memory provider |
 | `add_command_line(args=None, switch_mappings=None) -> ConfigurationBuilder` | Add CLI args provider |
 | `build() -> Configuration` | Build the configuration |
@@ -320,6 +321,13 @@ class EnvironmentVariablesConfigurationProvider(ConfigurationProvider):
 
 ```python
 class JsonFileConfigurationProvider(ConfigurationProvider):
+    def __init__(self, file_path: str)
+```
+
+### YamlFileConfigurationProvider
+
+```python
+class YamlFileConfigurationProvider(ConfigurationProvider):
     def __init__(self, file_path: str)
 ```
 
