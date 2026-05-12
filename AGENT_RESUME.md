@@ -2,6 +2,9 @@
 
 You are converting an existing Python project to use the **Python Application Builder** framework — a lightweight dependency injection framework built on clean architecture principles. It ships as a single module (`application_builder.py`) providing an IoC container with automatic constructor injection, multi-source configuration, background workers, structured logging, cooperative cancellation, job management, and a middleware pipeline.
 
+**Repository:** <https://github.com/Kiryuumaru/python_application_builder>
+Refer to the repository README, `docs/` folder, and `.github/instructions/` for detailed documentation, architecture rules, and code quality guidelines.
+
 Follow these steps to integrate the framework into the current project.
 
 ---
