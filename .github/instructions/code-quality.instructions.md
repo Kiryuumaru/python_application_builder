@@ -29,19 +29,23 @@ Build MUST complete with 0 warnings and 0 errors. Every warning is a potential b
 
 ---
 
-## Nullable Handling
+## None Handling
 
-The null-forgiving operator (`!`) is prohibited except when ALL conditions are met:
-1. Value is proven non-null at that point
-2. Compiler cannot infer this due to analysis limitations
+Use `Optional[T]` (or `T | None`) to mark values that may be `None`. Type-checker escape hatches (`# type: ignore`, `cast(T, value)`, `assert value is not None`) are prohibited except when ALL conditions are met:
+1. Value is proven non-`None` at that point
+2. Type checker cannot infer this due to analysis limitations
 3. Comment explains why it is safe
 4. No reasonable restructuring alternative exists
 
-Nullable handling patterns:
-- For possibly null value, USE `?? throw new InvalidOperationException()`
-- For null check, USE `if (x is null) return;`
-- For optional value, DECLARE as nullable type `T?`
-- For constructor parameter, USE `?? throw new ArgumentNullException(nameof(param))`
+None handling patterns:
+- For required value that may be `None`, USE `if value is None: raise ValueError(...)`
+- For `None` check, USE `if value is None: return`
+- For optional value, DECLARE as `Optional[T]` and provide `None` default explicitly
+- For constructor parameter, USE `if param is None: raise ValueError("param required")` at the top of `__init__`
+- For default mutable arguments, USE `param: Optional[List[X]] = None` then `param = param if param is not None else []`
+- MUST NEVER use mutable default arguments (`def f(x=[])`)
+- MUST NEVER use bare `except:` — always specify the exception type
+- MUST USE `is` / `is not` for `None` comparisons, never `==` / `!=`
 
 ---
 
@@ -102,20 +106,22 @@ Comments exist for future readers with no conversation context. The codebase sta
 
 ### Prohibited Comments
 
-- NEVER use `// TODO:` comments
-- NEVER use `// HACK:` comments
-- NEVER use `// FIXME:` comments
-- NEVER use `#pragma warning disable`
-- NEVER use `[SuppressMessage]` attributes (exception: `[UnconditionalSuppressMessage]` for AOT/trimming when no workaround exists)
-- NEVER use `var x = value!;` without justification comment
+- NEVER use `# TODO:` comments
+- NEVER use `# HACK:` comments
+- NEVER use `# FIXME:` comments
+- NEVER use `# type: ignore` without a justification comment on the same line
+- NEVER use `# noqa` without a specific rule code AND justification (e.g. `# noqa: E501 - URL must stay on one line`)
+- NEVER use `# pylint: disable=...` without justification
+- NEVER use `cast(T, value)` without a justification comment
+- NEVER use `assert value is not None` to silence a type checker without justification
 - NEVER write comments referencing prompts: "As requested", "Per instruction", "Added because asked"
 - NEVER write comments referencing conversation: "As discussed", "Per our conversation", "Following the plan"
 - NEVER write meta-comments: "NEW:", "CHANGED:", "This is the fix"
-- NEVER write obvious descriptions: "Loop through list", "Return result", "Check if null"
+- NEVER write obvious descriptions: "Loop through list", "Return result", "Check if None"
 - NEVER write comments that would not make sense 2 years later without conversation context
-- NEVER write XML documentation on internal implementation classes
+- NEVER write docstrings on internal implementation classes (prefix `_` or not in `__all__`)
 - NEVER describe what code does when code is self-explanatory
-- NEVER ignore compiler warnings
+- NEVER ignore linter or type-checker warnings
 - NEVER suppress warnings instead of fixing root cause
 
 ### Required Comments
@@ -134,20 +140,29 @@ Comments exist for future readers with no conversation context. The codebase sta
 
 ---
 
-## XML Documentation
+## Docstrings
 
-XML docs (`///`) are required for public types shared across layers. Internal types do not need XML docs.
+Docstrings (PEP 257 triple-quoted strings) are required for public types and functions shared across layers. Internal implementations do not need docstrings.
 
-Public cross-layer types MUST have XML docs:
-- Interfaces (public by design, used across layers)
-- Domain entities, value objects, records, enums
-- Application DTOs/models used by other layers
+Public cross-layer items MUST have docstrings:
+- ABC interfaces (services, providers, repositories, internal abstractions)
+- Abstract methods on those interfaces
+- Domain entities, value objects, events, enums
+- Application DTOs / models used by other layers
+- Module-level public APIs exported via `__all__`
 
-Internal types MUST NOT have XML docs:
-- Interface implementations (internal)
-- Infrastructure models/entities (internal)
-- Layer-internal helper classes
+Internal items MUST NOT have docstrings:
+- Interface implementations resolved via DI (prefix `_` or not in `__all__`)
+- Infrastructure adapters / repositories
+- Layer-internal helper classes and module-private functions
+
+Docstring style:
+- USE triple double-quotes `"""..."""`
+- USE one-line summary for single-purpose items
+- USE multi-line with `Args:` / `Returns:` / `Raises:` sections for non-trivial signatures
+- MUST NOT restate the function name or repeat type hints
+- MUST document `Raises:` for any exception that is part of the contract
 
 Quick rule:
-- `public` + cross-layer = XML docs required
-- `internal` = no XML docs
+- public ABC / cross-layer type = docstring required
+- module-private (`_name`) or internal implementation = no docstring
