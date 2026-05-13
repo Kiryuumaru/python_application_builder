@@ -30,7 +30,7 @@ Python Application Builder is a lightweight dependency injection framework for P
 
 - IoC container with automatic constructor injection
 - Service lifetimes: Singleton, Scoped, Transient
-- Multi-source configuration (environment, JSON, in-memory)
+- Multi-source configuration (environment, YAML/JSON, in-memory; YAML preferred)
 - Background workers with lifecycle management
 - Structured logging via loguru
 - Cooperative cancellation tokens
@@ -47,7 +47,7 @@ Python Application Builder is a lightweight dependency injection framework for P
 | Logging | loguru 0.7.3 |
 | YAML | pyyaml 6.0.3 |
 | Threading | stdlib `threading` |
-| Configuration | stdlib `json`, `os.environ` |
+| Configuration | stdlib `os.environ`, `pyyaml`, `json` (YAML preferred) |
 | IDE | Visual Studio (Python Tools) |
 | Project format | `.sln` + `.pyproj` |
 

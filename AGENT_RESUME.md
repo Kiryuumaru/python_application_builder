@@ -226,6 +226,23 @@ class _MyService(IMyService):
         self._logger = logger
 ```
 
+Create a baseline `src/appsettings.yaml` even if the existing project does not require external config. This gives operators one human-editable file to override defaults, and gives future features a place to land. YAML is preferred over JSON because it supports inline `#` comments and is designed as a human-authored configuration language.
+
+```yaml
+# appsettings.yaml -- baseline configuration
+# Keys use Section:SubSection:Key when read via IConfiguration.
+# Override any value with environment variables, e.g. APP__NAME=Other.
+
+App:
+  Name: MyApplication
+  Environment: Development
+
+Logging:
+  Level: INFO
+```
+
+Secrets MUST come from environment variables, not from this file.
+
 ---
 
 ## Step 10: Convert Logging to ILogger
@@ -250,10 +267,7 @@ import presentation
 def main() -> None:
     app = ApplicationBuilder()
 
-    app.add_json_file_configuration("appsettings.json")
-    app.add_configuration_dictionary({
-        "App": {"Name": "MyApplication"},
-    })
+    app.add_yaml_file_configuration("appsettings.yaml")
 
     domain.register(app)
     application.register(app)
