@@ -11,7 +11,8 @@ Before implementing, modifying, or asking questions, check the relevant document
 |------|-------|
 | New feature | `README.md` for similar patterns |
 | Modify framework | `README.md` API Reference section |
-| Write tests | `.github/instructions/code-quality.instructions.md` |
+| Write tests | `.github/instructions/ui-test-practices.instructions.md` |
+| Code conventions | `.github/instructions/code-quality.instructions.md` |
 | Architecture question | `.github/instructions/architecture.instructions.md` |
 
 ---
@@ -23,6 +24,7 @@ Before implementing, modifying, or asking questions, check the relevant document
 | API reference | `README.md` |
 | Architecture patterns | `.github/instructions/architecture.instructions.md` |
 | Code conventions | `.github/instructions/code-quality.instructions.md` |
+| Test conventions | `.github/instructions/ui-test-practices.instructions.md` |
 | Build commands | `.github/instructions/workflow.instructions.md` |
 
 ---
