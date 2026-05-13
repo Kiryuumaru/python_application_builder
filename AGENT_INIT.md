@@ -108,7 +108,28 @@ pip install -r requirements.txt
 
 ---
 
-## Step 7: Create the Composition Root
+## Step 7: Create the Baseline Configuration
+
+Create `src/appsettings.yaml` so operators have a single human-editable file to override defaults. YAML is preferred over JSON because it supports inline `#` comments and is designed as a human-authored configuration language.
+
+```yaml
+# appsettings.yaml -- baseline configuration
+# Keys use Section:SubSection:Key when read via IConfiguration.
+# Override any value with environment variables, e.g. APP__NAME=Other.
+
+App:
+  Name: MyApplication
+  Environment: Development
+
+Logging:
+  Level: INFO
+```
+
+As the project grows, add new sections here rather than hard-coding values. Secrets MUST come from environment variables, not from this file.
+
+---
+
+## Step 8: Create the Composition Root
 
 Create `src/presentation/__init__.py` (empty) and `src/presentation/main.py`:
 
@@ -130,11 +151,7 @@ class MainWorker(Worker):
 
 def main() -> None:
     app = ApplicationBuilder()
-    app.add_configuration_dictionary({
-        "App": {
-            "Name": "MyApplication",
-        },
-    })
+    app.add_yaml_file_configuration("appsettings.yaml")
     app.add_worker(MainWorker)
     app.run()
 
@@ -147,7 +164,7 @@ if __name__ == "__main__":
 
 ---
 
-## Step 8: Verify the Setup
+## Step 9: Verify the Setup
 
 The project structure MUST look like this:
 
@@ -175,6 +192,7 @@ The project structure MUST look like this:
 │       ├── samples.md
 │       └── workers.md
 ├── src/
+│   ├── appsettings.yaml
 │   ├── application_builder.py
 │   ├── presentation/
 │   │   ├── __init__.py
@@ -194,7 +212,7 @@ Expected: the application starts, prints a structured log message via loguru, an
 
 ---
 
-## Step 9: Pre-Commit Verification
+## Step 10: Pre-Commit Verification
 
 Per `workflow.instructions.md`:
 

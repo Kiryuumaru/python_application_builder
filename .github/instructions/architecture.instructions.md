@@ -216,11 +216,16 @@ Transient:
 - USE `get_section()` for grouping related settings
 - Environment variables USE double-underscore `__` or single-underscore `_` as separator
 - Later configuration providers override earlier ones
+- PREFER YAML files (`appsettings.yaml`) over JSON for file-based configuration
+- USE JSON only when YAML is not supported by the toolchain
+
+YAML is the preferred configuration format because it supports inline comments (`#`) and is designed as a human-authored configuration language. JSON forbids comments by spec, which forces operators to either remove documentation before edits or maintain parallel documentation outside the config file. For settings that humans read and edit, comment support is a hard requirement.
 
 | Source | Priority | Example |
 |--------|----------|---------|
 | Environment variables | Low (loaded first) | `APP_DATABASE__HOST` |
-| JSON file | Medium | `appsettings.json` |
+| YAML file (preferred) | Medium | `appsettings.yaml` |
+| JSON file (fallback) | Medium | `appsettings.json` |
 | In-memory dictionary | High (loaded last) | `add_configuration_dictionary()` |
 
 ---
