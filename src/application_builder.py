@@ -539,14 +539,15 @@ class Configuration(IConfiguration):
         return None
 
     def reload(self) -> None:
-        """Reloads configuration from all providers."""
-        self._data = {}
+        """Reloads configuration from all providers.
 
-        # Load configuration from each provider in order
+        Builds a new dictionary first, then swaps it in atomically so concurrent
+        readers never observe a partially-populated state.
+        """
+        new_data: Dict[str, str] = {}
         for provider in self._providers:
-            provider_data = provider.load()
-            # Later providers override earlier ones
-            self._data.update(provider_data)
+            new_data.update(provider.load())
+        self._data = new_data
 
     def get_section(self, key: str) -> IConfigurationSection:
         """Gets a configuration sub-section with the specified key."""
@@ -1955,33 +1956,35 @@ class ApplicationBuilder:
 
         log.info("Application started. Press Ctrl+C to exit.")
 
+        # Stop event triggered by stop_application() or OS signals
+        stop_event = threading.Event()
+
+        if lifetime:
+            lifetime.application_stopping.register(stop_event.set)
+
         # Start hosted services after startup notification
         self._service_provider.start_hosted_services()
 
         def handle_exit(sig, frame):
-            log.info("Application shutting down...")
             if lifetime:
                 lifetime.notify_stopping()
-            if self._service_provider:
-                self._service_provider.stop_hosted_services()
-            if lifetime:
-                lifetime.notify_stopped()
-            sys.exit(0)
+            stop_event.set()
 
         signal.signal(signal.SIGINT, handle_exit)
         signal.signal(signal.SIGTERM, handle_exit)
 
         try:
-            while True:
-                time.sleep(1)
+            while not stop_event.is_set():
+                stop_event.wait(timeout=1.0)
         except KeyboardInterrupt:
-            log.info("Application shutting down...")
             if lifetime:
                 lifetime.notify_stopping()
-            if self._service_provider:
-                self._service_provider.stop_hosted_services()
-            if lifetime:
-                lifetime.notify_stopped()
+
+        log.info("Application shutting down...")
+        if self._service_provider:
+            self._service_provider.stop_hosted_services()
+        if lifetime:
+            lifetime.notify_stopped()
 
 class ServiceProvider:
     """Resolves services from the service collection using dependency injection."""
