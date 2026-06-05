@@ -186,6 +186,7 @@ Transient:
 - MUST be lightweight
 - MUST NOT hold expensive resources
 - USE for stateless utilities, messages, short-lived objects
+- MUST propagate `CancellationToken` to all downstream blocking calls when accepted
 
 ---
 
@@ -197,6 +198,7 @@ Transient:
 - MUST use `self.wait_for_stop(timeout)` instead of `time.sleep()`
 - MUST handle exceptions within the execute loop
 - MUST NOT block indefinitely without checking stop signal
+- MUST pass `self.stopping_token` to any downstream blocking calls (e.g. HTTP clients, DB queries, sleeps)
 
 ---
 
@@ -495,6 +497,27 @@ class IIdentityUnitOfWork(IUnitOfWork): ...
 - Infrastructure MUST implement feature-specific interfaces, NOT base `IUnitOfWork`
 - Services MUST inject feature-specific interfaces, NOT base `IUnitOfWork`
 - Each UnitOfWork defines one atomicity boundary
+
+---
+
+## Cancellation Discipline
+
+All methods performing I/O, network calls, file operations, sleeps, or any blocking/waiting logic MUST accept a `CancellationToken` parameter and propagate it to every downstream blocking call.
+
+### Required Approach
+
+- MUST accept `cancellation_token: CancellationToken` on any method that performs I/O, network calls, file operations, sleeps, or blocking waits
+- MUST propagate the token to every downstream blocking call: `await asyncio.sleep(..., cancel=token)`, `requests.get(..., timeout=token)`, DB queries, HTTP calls, file reads/writes
+- MUST pass the token through the entire call chain — a service calling a repository MUST accept a token and forward it
+- MUST check `token.is_cancellation_requested` before entering blocking operations and after each await point
+- MUST use `token.register(callback)` for cleanup on cancellation
+
+### Prohibited
+
+- NEVER call blocking I/O without a cancellation token
+- NEVER fire-and-forget a loop without checking `is_cancellation_requested`
+- NEVER swallow `CancelledError` or `CancellationRequested` without cleanup
+- NEVER create a `CancellationToken.none()` as a default to silence the requirement — if a caller cannot provide a token, the method is not cancellable and MUST be documented as such
 
 ---
 
@@ -1080,3 +1103,4 @@ def run(provider: ServiceProvider, cts: CancellationTokenSource) -> None:
 - NEVER use mutable attributes in `ValueObject`
 - NEVER use bare `except:` — always specify exception type
 - NEVER use `time.sleep()` in workers — use `wait_for_stop()`
+- NEVER perform blocking I/O, network calls, file operations, or sleeps without a `CancellationToken`
