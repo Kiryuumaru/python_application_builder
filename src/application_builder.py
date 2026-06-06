@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 import uuid
+from pathlib import Path
 import loguru
 import yaml
 import threading
@@ -162,6 +163,11 @@ class IConfigurationSection(ABC):
     @abstractmethod
     def get_list(self, key: str, default: Optional[List] = None) -> Optional[List]:
         """Gets a configuration value as a list."""
+        pass
+
+    @abstractmethod
+    def get_path(self, key: str, default: Optional[Path] = None) -> Optional[Path]:
+        """Gets a configuration value as a Path object."""
         pass
 
 
@@ -514,6 +520,16 @@ class ConfigurationSection(IConfigurationSection):
                 return [item.strip() for item in value.split(',')]
             return default
 
+    def get_path(self, key: str, default: Optional[Path] = None) -> Optional[Path]:
+        """Gets a configuration value as a Path object."""
+        value = self.get(key)
+        if value is None:
+            return default
+        try:
+            return Path(value)
+        except (TypeError, ValueError):
+            return default
+
 
 class Configuration(IConfiguration):
     """Implementation of application configuration."""
@@ -630,6 +646,16 @@ class Configuration(IConfiguration):
             # Fall back to comma-separated values
             if isinstance(value, str):
                 return [item.strip() for item in value.split(',')]
+            return default
+
+    def get_path(self, key: str, default: Optional[Path] = None) -> Optional[Path]:
+        """Gets a configuration value as a Path object."""
+        value = self.get(key)
+        if value is None:
+            return default
+        try:
+            return Path(value)
+        except (TypeError, ValueError):
             return default
 
 

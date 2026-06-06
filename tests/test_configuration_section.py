@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 from application_builder import (
     Configuration,
     ConfigurationSection,
@@ -142,6 +143,45 @@ class TestConfigurationGetList:
     def test_missing_key_returns_none_without_default(self):
         config = _build_config({})
         assert config.get_list("Items") is None
+
+
+class TestConfigurationGetPath:
+    def test_valid_unix_path(self):
+        config = _build_config({"Dir": "/usr/local/bin"})
+        result = config.get_path("Dir")
+        assert result == Path("/usr/local/bin")
+        assert isinstance(result, Path)
+
+    def test_valid_windows_path(self):
+        config = _build_config({"Dir": "C:\\Users\\Admin\\data"})
+        result = config.get_path("Dir")
+        assert result == Path("C:\\Users\\Admin\\data")
+
+    def test_relative_path(self):
+        config = _build_config({"Dir": "relative/path/to/file.txt"})
+        result = config.get_path("Dir")
+        assert result == Path("relative/path/to/file.txt")
+
+    def test_missing_key_returns_default(self):
+        config = _build_config({})
+        default = Path("/tmp")
+        assert config.get_path("Dir", default) == default
+
+    def test_missing_key_returns_none_without_default(self):
+        config = _build_config({})
+        assert config.get_path("Dir") is None
+
+    def test_section_get_path(self):
+        config = _build_config({"App:DataDir": "/var/data"})
+        section = config.get_section("App")
+        result = section.get_path("DataDir")
+        assert result == Path("/var/data")
+
+    def test_section_get_path_missing_returns_default(self):
+        config = _build_config({})
+        section = config.get_section("App")
+        default = Path(".")
+        assert section.get_path("Missing", default) == default
 
 
 class TestConfigurationReload:
